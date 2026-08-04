@@ -41,13 +41,14 @@
 
 - `content.js` — 播放器解析、overlay 挂载、文件载入、rAF 同步循环、偏移/字号/透明度、SPA 重挂载(MutationObserver);仅在视频页(/video/、/bangumi/play/、/list/)创建面板
 - `content.css` — 面板 UI
-- `lib/bundle.js` — niconicomments v0.3.1 上游原版 bundle(来自 nico-comment-dl/vendor/niconicomments,含 CSSRenderer),零修改复用
+- `lib/bundle.js` — [niconicomments](https://github.com/xpadev-net/niconicomments) v0.3.1 上游原版 bundle(来自 nico-comment-dl/vendor/niconicomments,含 CSSRenderer),零修改复用
 - `lib/input.js` — XML/JSON 解析(同 iina-plugin-danmaku-cosmos)
 - `test-data/sample-nico.json` — 68 条 v1 格式测试弹幕
 - `test/harness/index.html` — 本地测试台:复刻 bpx 播放器 DOM + 真视频,直接用扩展同款文件验证引擎/同步/UI
 
 ### 引擎集成要点
 
+- 引擎: [niconicomments](https://github.com/xpadev-net/niconicomments) (xpadev-net),上游原版零修改复用
 - 渲染模式:上游原生 canvas 模式(`mode: 'default'`),引擎内部用 **WebGL2**(失败自动回退 Canvas2D),1920×1080 内部分辨率,CSS 拉伸铺满 host
 - overlay host(绝对定位填满视频框)里放一个 `<canvas>`,CSS `width/height:100%` 拉伸,`pointer-events:none`,透明度由面板控制
 - 弹幕同步:rAF dt 累积时钟(同 nico-comment-dl preview 方案)——播放/seek/恢复时对锚到 `video.currentTime`,中间自由运行不做逐媒体帧校正(媒体时钟有抖动,校正反而造成微跳);浮点 vpos 每帧 `drawCanvas`;seek 差 >1.5s 时 `clear()` 重绘;暂停时保留最后一帧,仅 seek 时重绘
