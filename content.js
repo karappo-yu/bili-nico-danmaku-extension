@@ -139,7 +139,10 @@
     const bvid = q.match(/[?&]bvid=([^&]+)/);
     const ep = q.match(/[?&]ep=(\d+)/);
     const p = q.match(/[?&]p=(\d+)/);
-    return location.pathname
+    // 尾斜杠规范化: B 站导航会在 /video/BV1xx/ 与 /video/BV1xx 之间变化,
+    // 不规范化会导致同一视频存/查用不同 key
+    const path = location.pathname.replace(/\/+$/, '');
+    return path
       + (bvid ? '|' + bvid[1] : '')
       + (ep ? '|ep' + ep[1] : '')
       + (p ? '|p' + p[1] : '');
@@ -344,29 +347,50 @@
     if (vid) idbDelete(vid).catch(() => {});
   }
 
+  // 兼容旧数据: 早期版本存过带尾斜杠的 key (/video/BV1xx/|p2 vs /video/BV1xx|p2)
+  function normVidKey(k) {
+    const i = typeof k === 'string' ? k.indexOf('|') : -1;
+    const path = (i === -1 ? String(k) : k.slice(0, i)).replace(/\/+$/, '');
+    return path + (i === -1 ? '' : k.slice(i));
+  }
+  function lookupRecord(all, vid) {
+    if (!all) return null;
+    if (all[vid]) return all[vid];
+    for (const k in all) {
+      if (normVidKey(k) === vid) return all[k]; // 旧数据兼容
+    }
+    return null;
+  }
+  function matchingKeys(all, vid) {
+    const keys = [vid];
+    for (const k in all) {
+      if (k !== vid && normVidKey(k) === vid) keys.push(k);
+    }
+    return keys;
+  }
+
   // ---------- 弹幕文件关联记忆 ----------
   // 选择文件时记住视频号 + 偏移; 刷新后自动加载
   // handle 模式: 本地文件句柄存 IDB (直接读盘, 不占 storage); content 模式: 文件内容存 storage (fallback)
   async function saveDanmakuRecord(vid, name, text, handle) {
     if (!vid) return;
     try {
+      let handleOk = false;
       if (handle) {
-        try { await idbPut(vid, handle); } catch (e) { handle = null; } // IDB 存句柄失败 → 降级内容模式
+        try { await idbPut(vid, handle); handleOk = true; } catch (e) { handleOk = false; }
       }
-      if (handle) {
-        chrome.storage.local.get(DANMAKU_KEY, (res) => {
-          const all = (res && res[DANMAKU_KEY]) || {};
-          all[vid] = { name, offset: settings.offset, ts: Date.now(), source: 'handle' };
-          chrome.storage.local.set({ [DANMAKU_KEY]: all });
-        });
-      } else {
-        chrome.storage.local.get(DANMAKU_KEY, (res) => {
-          const all = (res && res[DANMAKU_KEY]) || {};
-          all[vid] = { name, text, offset: settings.offset, ts: Date.now(), source: 'content' };
-          chrome.storage.local.set({ [DANMAKU_KEY]: all });
-        });
-        idbDelete(vid).catch(() => {});
-      }
+      // 双保险: handle 记录也存 text — 句柄权限失效/文件移动时仍能从内容恢复
+      // (unlimitedStorage 后空间无虞, 句柄读取失败才用 text)
+      chrome.storage.local.get(DANMAKU_KEY, (res) => {
+        const all = (res && res[DANMAKU_KEY]) || {};
+        all[vid] = { name, text, offset: settings.offset, ts: Date.now(), source: handleOk ? 'handle' : 'content' };
+        // 清理同视频的旧 key (尾斜杠变体), 数据迁移归一
+        for (const k in all) {
+          if (k !== vid && normVidKey(k) === vid) delete all[k];
+        }
+        chrome.storage.local.set({ [DANMAKU_KEY]: all });
+      });
+      if (!handleOk) idbDelete(vid).catch(() => {});
     } catch (e) {}
   }
 
@@ -376,10 +400,12 @@
     try {
       chrome.storage.local.get(DANMAKU_KEY, (res) => {
         const all = (res && res[DANMAKU_KEY]) || {};
-        if (all[vid]) {
-          all[vid].offset = settings.offset;
-          chrome.storage.local.set({ [DANMAKU_KEY]: all });
+        let changed = false;
+        for (const k of matchingKeys(all, vid)) {
+          all[k].offset = settings.offset;
+          changed = true;
         }
+        if (changed) chrome.storage.local.set({ [DANMAKU_KEY]: all });
       });
     } catch (e) {}
   }
@@ -390,10 +416,12 @@
     try {
       chrome.storage.local.get(DANMAKU_KEY, (res) => {
         const all = (res && res[DANMAKU_KEY]) || {};
-        if (all[vid]) {
-          delete all[vid];
-          chrome.storage.local.set({ [DANMAKU_KEY]: all });
+        let changed = false;
+        for (const k of matchingKeys(all, vid)) {
+          delete all[k];
+          changed = true;
         }
+        if (changed) chrome.storage.local.set({ [DANMAKU_KEY]: all });
       });
     } catch (e) {}
   }
@@ -402,7 +430,7 @@
   function applyStoredOffset(vid) {
     try {
       chrome.storage.local.get(DANMAKU_KEY, (res) => {
-        const rec = res && res[DANMAKU_KEY] && res[DANMAKU_KEY][vid];
+        const rec = lookupRecord(res && res[DANMAKU_KEY], vid);
         settings.offset = Number(rec && rec.offset) || 0;
         saveSettings();
         if (offsetEl) {
@@ -415,21 +443,29 @@
 
   // 刷新/切集后自动加载: 本地文件句柄 (IDB) 优先, 其次 storage 内容记录
   let autoLoading = false;
+  let autoLoadingTimer = null;
   function maybeAutoLoad() {
     if (data || autoLoading) return;
     const vid = currentVideoId();
     if (!vid) return;
     autoLoading = true;
+    // 超时保护: 任何异步挂起 (IDB/权限/文件读取) 都不允许永久卡死 autoLoading
+    autoLoadingTimer = setTimeout(() => { autoLoading = false; }, 5000);
+    const settle = () => { clearTimeout(autoLoadingTimer); autoLoading = false; };
     const fromContent = () => {
       try {
         chrome.storage.local.get(DANMAKU_KEY, (res) => {
-          const rec = res && res[DANMAKU_KEY] && res[DANMAKU_KEY][vid];
-          autoLoading = false;
-          if (!rec || !rec.text) return;
+          const rec = lookupRecord(res && res[DANMAKU_KEY], vid);
+          if (!rec || !rec.text) {
+            settle();
+            setStatus('未找到该视频的关联弹幕, 请选择文件');
+            return;
+          }
+          settle();
           applyStoredOffset(vid);
           loadFile(new File([rec.text], rec.name || 'auto-danmaku.json', { type: 'application/json' }));
         });
-      } catch (e) { autoLoading = false; }
+      } catch (e) { settle(); }
     };
     try {
       idbGet(vid).then(async (handle) => {
@@ -438,12 +474,12 @@
           const st = await handle.requestPermission({ mode: 'read' });
           if (st !== 'granted') { fromContent(); return; }
           const f = await handle.getFile();
-          autoLoading = false;
+          settle();
           applyStoredOffset(vid);
           loadFile(f, handle); // 直接从磁盘读最新内容
         } catch (e) { fromContent(); }
       }).catch(fromContent);
-    } catch (e) { autoLoading = false; }
+    } catch (e) { settle(); }
   }
 
   // ---------- 设置持久化 ----------
