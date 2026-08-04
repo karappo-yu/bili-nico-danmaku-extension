@@ -18,6 +18,7 @@
   let lastVpos = -1;
   let resolveTimer = null;
   let currentFile = null;
+  let loadedVideoId = null;  // 载入弹幕时的视频身份, 换视频后清除弹幕
 
   const settings = {
     offset: 0,       // 秒
@@ -89,6 +90,19 @@
   // ---------- 播放器解析 ----------
   function isPlayerPage() {
     return /\/video\/|\/bangumi\/play\/|\/list\//.test(location.pathname);
+  }
+
+  // 视频身份: pathname (含BV/ep) + bvid/ep/p 查询参数
+  // 分P (?p=2)、番剧集数 (ep)、合集视频 (bvid) 切换都会导致身份变化
+  function currentVideoId() {
+    const q = location.search;
+    const bvid = q.match(/[?&]bvid=([^&]+)/);
+    const ep = q.match(/[?&]ep=(\d+)/);
+    const p = q.match(/[?&]p=(\d+)/);
+    return location.pathname
+      + (bvid ? '|' + bvid[1] : '')
+      + (ep ? '|ep' + ep[1] : '')
+      + (p ? '|p' + p[1] : '');
   }
 
   function findVideo() {
@@ -236,6 +250,7 @@
       if (!Array.isArray(loaded) || loaded.length === 0) throw new Error('弹幕数据为空');
       data = loaded;
       currentFile = file.name;
+      loadedVideoId = currentVideoId();
       if (host) initEngine();
       else if (video) { mountHost(video); initEngine(); }
       setStatus(file.name + ' · ' + countComments(data) + ' 条', true);
@@ -250,6 +265,7 @@
     destroyEngine();
     data = null;
     currentFile = null;
+    loadedVideoId = null;
     fileInput.value = '';
     fileNameEl.textContent = '未选择文件';
     setStatus('');
@@ -426,11 +442,17 @@
   // ---------- 挂载/重挂载 ----------
   function attach(v) {
     if (video === v) return;
+    // 换视频了: 清掉旧弹幕, 不继续播
+    const videoChanged = data && loadedVideoId !== null && currentVideoId() !== loadedVideoId;
     unbindVideoEvents(video);
     video = v;
     bindVideoEvents(v);
     syncAnchor(v.currentTime);
     lastVpos = -1;
+    if (videoChanged) {
+      clearDanmaku();
+      setStatus('视频已切换, 弹幕已清除');
+    }
     mountHost(v);
     if (data) initEngine();
   }
@@ -468,6 +490,12 @@
 
     setInterval(() => {
       if (!isPlayerPage()) { teardownAll(); return; }
+      // 同元素换源 (URL 变了但 video 元素没换) 也要清弹幕
+      if (data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) {
+        clearDanmaku();
+        setStatus('视频已切换, 弹幕已清除');
+        return;
+      }
       if (!video) { resolve(); return; }
       if (!document.contains(video)) resolve();
     }, 1500);
