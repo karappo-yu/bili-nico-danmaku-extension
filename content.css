@@ -4,7 +4,7 @@
   top: 72px;
   right: 16px;
   z-index: 2147483646;
-  width: 260px;
+  width: 300px;
   background: rgba(20, 22, 28, 0.94);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
@@ -50,11 +50,12 @@
   font-size: 12px;
 }
 #nico-dm-panel .ndp-val {
-  flex: 0 0 52px;
+  flex: 0 0 64px;
   text-align: right;
   color: #00a1d6;
   font-family: Menlo, Consolas, monospace;
   font-size: 11px;
+  white-space: nowrap;
 }
 #nico-dm-panel input[type="range"] {
   flex: 1;
@@ -110,7 +111,9 @@
   font-size: 11px;
   color: #6b7280;
   min-height: 14px;
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #nico-dm-panel .ndp-status.ndp-err { color: #f87171; }
 #nico-dm-panel .ndp-status.ndp-ok { color: #4ade80; }
