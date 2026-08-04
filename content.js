@@ -139,11 +139,13 @@
     const bvid = q.match(/[?&]bvid=([^&]+)/);
     const ep = q.match(/[?&]ep=(\d+)/);
     const p = q.match(/[?&]p=(\d+)/);
-    // 尾斜杠规范化: B 站导航会在 /video/BV1xx/ 与 /video/BV1xx 之间变化,
-    // 不规范化会导致同一视频存/查用不同 key
+    // 尾斜杠规范化: B 站导航会在 /video/BV1xx/ 与 /video/BV1xx 之间变化
     const path = location.pathname.replace(/\/+$/, '');
+    // bvid 参数仅在 pathname 不含视频标识时拼接 (合集/列表页需要它区分不同视频);
+    // 普通视频/番剧的 BV/ep 已在 pathname 里, 忽略 bvid 参数避免 key 随 URL 形态抖动
+    const needBvid = !/\/BV|EP\d+/i.test(path);
     return path
-      + (bvid ? '|' + bvid[1] : '')
+      + (needBvid && bvid ? '|' + bvid[1] : '')
       + (ep ? '|ep' + ep[1] : '')
       + (p ? '|p' + p[1] : '');
   }
@@ -347,24 +349,31 @@
     if (vid) idbDelete(vid).catch(() => {});
   }
 
-  // 兼容旧数据: 早期版本存过带尾斜杠的 key (/video/BV1xx/|p2 vs /video/BV1xx|p2)
+  // 兼容旧数据: 早期版本存过带尾斜杠 / 带 bvid 参数段的 key
+  // (/video/BV1xx/|p2 vs /video/BV1xx|p2; /video/BV1xx|bvidBV1xx|p2)
   function normVidKey(k) {
     const i = typeof k === 'string' ? k.indexOf('|') : -1;
     const path = (i === -1 ? String(k) : k.slice(0, i)).replace(/\/+$/, '');
     return path + (i === -1 ? '' : k.slice(i));
   }
+  // 宽松归一: 尾斜杠 + 去掉 bvid 参数段 (普通视频页 pathname 已含 BV)
+  function looseNorm(k) {
+    return normVidKey(k).replace(/\|bv[^|]*/i, '');
+  }
   function lookupRecord(all, vid) {
     if (!all) return null;
     if (all[vid]) return all[vid];
+    const vn = looseNorm(vid);
     for (const k in all) {
-      if (normVidKey(k) === vid) return all[k]; // 旧数据兼容
+      if (normVidKey(k) === vid || looseNorm(k) === vn) return all[k]; // 旧数据兼容
     }
     return null;
   }
   function matchingKeys(all, vid) {
     const keys = [vid];
+    const vn = looseNorm(vid);
     for (const k in all) {
-      if (k !== vid && normVidKey(k) === vid) keys.push(k);
+      if (k !== vid && (normVidKey(k) === vid || looseNorm(k) === vn)) keys.push(k);
     }
     return keys;
   }
@@ -384,9 +393,9 @@
       chrome.storage.local.get(DANMAKU_KEY, (res) => {
         const all = (res && res[DANMAKU_KEY]) || {};
         all[vid] = { name, text, offset: settings.offset, ts: Date.now(), source: handleOk ? 'handle' : 'content' };
-        // 清理同视频的旧 key (尾斜杠变体), 数据迁移归一
+        // 清理同视频的旧 key (尾斜杠/bvid 参数变体), 数据迁移归一
         for (const k in all) {
-          if (k !== vid && normVidKey(k) === vid) delete all[k];
+          if (k !== vid && (normVidKey(k) === vid || looseNorm(k) === looseNorm(vid))) delete all[k];
         }
         chrome.storage.local.set({ [DANMAKU_KEY]: all });
       });
@@ -458,7 +467,12 @@
           const rec = lookupRecord(res && res[DANMAKU_KEY], vid);
           if (!rec || !rec.text) {
             settle();
-            setStatus('未找到该视频的关联弹幕, 请选择文件');
+            // 延迟确认: B 站切 P 时 URL 可能还在渐进变化 (临时参数), 先别报未找到;
+            // 期间已加载 (data) 或已切到别处 (URL 变) 就不报
+            setTimeout(() => {
+              if (data || currentVideoId() !== vid) return;
+              setStatus('未找到该视频的关联弹幕, 请选择文件', 'err');
+            }, 2000);
             return;
           }
           settle();
@@ -628,10 +642,14 @@
     }
   }
 
-  function setStatus(msg, ok) {
+  function setStatus(msg, kind) {
     if (!statusEl) return;
     statusEl.textContent = msg || '';
-    statusEl.className = 'ndp-status' + (ok ? ' ndp-ok' : msg ? ' ndp-err' : '');
+    // 三态: ok 绿 / err 红 / 不传或 undefined 中性灰 (兼容旧调用 true/false)
+    let cls = 'ndp-status';
+    if (kind === true || kind === 'ok') cls += ' ndp-ok';
+    else if (kind === false || kind === 'err') cls += ' ndp-err';
+    statusEl.className = cls;
   }
 
   // ---------- 视频事件 ----------
