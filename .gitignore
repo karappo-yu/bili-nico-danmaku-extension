@@ -1,0 +1,3 @@
+.DS_Store
+# 测试视频是 ffmpeg 生成的, 不入库 (见 README 测试节)
+test/harness/test.mp4

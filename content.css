@@ -1,0 +1,125 @@
+/* ============ 浮动面板 ============ */
+#nico-dm-panel {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 2147483646;
+  width: 260px;
+  background: rgba(20, 22, 28, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #e8e8e8;
+  font: 12px/1.5 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  user-select: none;
+  overflow: hidden;
+}
+#nico-dm-panel * { box-sizing: border-box; }
+#nico-dm-panel .ndp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: move;
+  font-weight: 600;
+  font-size: 13px;
+}
+#nico-dm-panel .ndp-head .ndp-title { color: #00a1d6; }
+#nico-dm-panel .ndp-collapse {
+  border: 0;
+  background: none;
+  color: #aaa;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+#nico-dm-panel .ndp-body { padding: 10px; }
+#nico-dm-panel.ndp-collapsed .ndp-body { display: none; }
+
+#nico-dm-panel .ndp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+#nico-dm-panel .ndp-row:last-child { margin-bottom: 0; }
+#nico-dm-panel label.ndp-label {
+  flex: 0 0 64px;
+  color: #9aa0aa;
+  font-size: 12px;
+}
+#nico-dm-panel .ndp-val {
+  flex: 0 0 52px;
+  text-align: right;
+  color: #00a1d6;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 11px;
+}
+#nico-dm-panel input[type="range"] {
+  flex: 1;
+  accent-color: #00a1d6;
+  height: 4px;
+  cursor: pointer;
+}
+#nico-dm-panel input[type="checkbox"] { accent-color: #00a1d6; cursor: pointer; }
+
+#nico-dm-panel .ndp-file {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+#nico-dm-panel .ndp-file-btn {
+  flex: 0 0 auto;
+  background: #00a1d6;
+  color: #fff;
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 12px;
+}
+#nico-dm-panel .ndp-file-btn:hover { background: #00b4e8; }
+#nico-dm-panel .ndp-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #9aa0aa;
+  font-size: 11px;
+  line-height: 24px;
+}
+#nico-dm-panel .ndp-actions {
+  display: flex;
+  gap: 6px;
+}
+#nico-dm-panel .ndp-btn {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8e8e8;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+  padding: 4px 0;
+  cursor: pointer;
+  font-size: 12px;
+}
+#nico-dm-panel .ndp-btn:hover { background: rgba(255, 255, 255, 0.16); }
+#nico-dm-panel .ndp-status {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #6b7280;
+  min-height: 14px;
+  word-break: break-all;
+}
+#nico-dm-panel .ndp-status.ndp-err { color: #f87171; }
+#nico-dm-panel .ndp-status.ndp-ok { color: #4ade80; }
+
+/* ============ 隐藏 B 站原生弹幕 ============ */
+html[data-nico-hide-bili] .bpx-player-dm,
+html[data-nico-hide-bili] .bpx-player-dm-wrap,
+html[data-nico-hide-bili] .danmaku-box,
+html[data-nico-hide-bili] #bilibili-player .bilibili-player-video-danmaku,
+html[data-nico-hide-bili] .bilibili-player-video-danmaku {
+  display: none !important;
+}

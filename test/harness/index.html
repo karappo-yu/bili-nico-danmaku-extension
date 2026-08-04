@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>扩展测试台 · 伪 bpx 播放器</title>
+<link rel="stylesheet" href="/content.css">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #e8eaf0; font-family: -apple-system, "PingFang SC", sans-serif; }
+  /* 模拟 B 站页头(把播放器往下推,验证 overlay 不受页头影响) */
+  .page-header { height: 60px; background: #fff; display: flex; align-items: center; padding: 0 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1); position: sticky; top: 0; z-index: 10; font-size: 14px; }
+  .page-header .logo { color: #00a1d6; font-weight: 700; margin-right: 24px; }
+  .page-header input { flex: 1; max-width: 480px; height: 30px; border: 1px solid #ddd; border-radius: 6px; padding: 0 12px; }
+  .page-wrap { max-width: 980px; margin: 20px auto; }
+  .page-title { font-size: 16px; margin-bottom: 12px; }
+
+  /* ===== 伪 bpx 播放器结构 ===== */
+  .bpx-player-container { position: relative; width: 960px; height: 540px; background: #000; border-radius: 6px; overflow: hidden; }
+  .bpx-player-video-wrap { position: absolute; inset: 0; background: #000; }
+  .bpx-player-video-wrap video { width: 100%; height: 100%; object-fit: contain; }
+  /* 伪 B 站原生弹幕层 */
+  .bpx-player-dm { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+  .bpx-player-dm .fake-dm { position: absolute; top: 20%; left: 100%; white-space: nowrap; color: #fff;
+    font-size: 22px; text-shadow: 1px 1px 2px #000; animation: fake-scroll 8s linear infinite; }
+  @keyframes fake-scroll { from { transform: translateX(0); } to { transform: translateX(-1400px); } }
+  /* 伪控制条 */
+  .bpx-player-control-wrap { position: absolute; left: 0; right: 0; bottom: 0; height: 48px; z-index: 100;
+    background: linear-gradient(transparent, rgba(0,0,0,.7)); display: flex; align-items: flex-end; gap: 10px; padding: 0 14px 8px; }
+  .bpx-player-control-wrap button { background: rgba(255,255,255,.15); color: #fff; border: 0; border-radius: 4px; padding: 6px 12px; cursor: pointer; }
+  .bpx-player-control-wrap .time { color: #fff; font-size: 12px; font-family: Menlo, monospace; }
+  .bpx-player-control-wrap .progress { flex: 1; height: 4px; }
+</style>
+</head>
+<body>
+  <header class="page-header">
+    <span class="logo">哔哩哔哩 (测试台)</span>
+    <input placeholder="搜索 (装饰)">
+  </header>
+  <div class="page-wrap">
+    <div class="page-title">伪 bpx 播放器 — 扩展应把 Nico 弹幕 overlay 挂进 .bpx-player-video-wrap,不受页头影响</div>
+    <div class="bpx-player-container">
+      <div class="bpx-player-video-wrap">
+        <video id="video" src="/test/harness/test.mp4" preload="metadata" muted></video>
+        <div class="bpx-player-dm">
+          <div class="fake-dm" style="top:12%">B站原生弹幕(应被隐藏)</div>
+          <div class="fake-dm" style="top:40%; animation-delay:-3s">原生弹幕2</div>
+          <div class="fake-dm" style="top:70%; animation-delay:-6s">原生弹幕3</div>
+        </div>
+      </div>
+      <div class="bpx-player-control-wrap">
+        <button id="playPause">▶ 播放</button>
+        <button id="seekBack">⏪5s</button>
+        <input type="range" class="progress" id="progress" min="0" max="100" value="0" step="0.05">
+        <span class="time" id="time">00:00 / 01:30</span>
+      </div>
+    </div>
+    <p style="margin-top:12px;color:#666;font-size:12px">
+      测试步骤: ① 点右上角「选择弹幕文件」加载 <code>extension/test-data/sample-nico.json</code>
+      (自动化: 控制台 <code>window.postMessage({type:'nico-dm:load', name:'sample.json', text:JSON.stringify(SAMPLE)}, '*')</code>)
+      ② 播放视频看弹幕 ③ 拖偏移滑块 ④ 取消勾选"隐藏B站弹幕"看原生层回来
+    </p>
+  </div>
+
+  <script>
+    const video = document.getElementById('video');
+    const playPause = document.getElementById('playPause');
+    const progress = document.getElementById('progress');
+    const timeEl = document.getElementById('time');
+    playPause.onclick = () => video.paused ? video.play() : video.pause();
+    document.getElementById('seekBack').onclick = () => video.currentTime = Math.max(0, video.currentTime - 5);
+    video.addEventListener('timeupdate', () => {
+      progress.value = video.currentTime / video.duration * 100;
+      const f = (s) => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+      timeEl.textContent = f(video.currentTime) + ' / ' + f(video.duration || 0);
+    });
+    progress.oninput = () => video.currentTime = progress.value / 100 * video.duration;
+    video.addEventListener('play', () => playPause.textContent = '⏸ 暂停');
+    video.addEventListener('pause', () => playPause.textContent = '▶ 播放');
+    // 预载示例数据供自动化用
+    window.SAMPLE = null;
+    fetch('/test-data/sample-nico.json').then(r => r.json()).then(d => window.SAMPLE = d);
+  </script>
+
+  <!-- 与扩展完全相同的文件,按 manifest 顺序加载 -->
+  <script src="/lib/bundle.js"></script>
+  <script src="/lib/input.js"></script>
+  <script src="/content.js"></script>
+</body>
+</html>
