@@ -4,6 +4,32 @@
 <meta charset="UTF-8">
 <title>扩展测试台 · 伪 bpx 播放器</title>
 <link rel="stylesheet" href="/content.css">
+<script>
+  // ===== chrome.storage mock (localStorage 持久化, 跨刷新保留, 模拟扩展 storage) =====
+  // 必须在 content.js 之前加载
+  (function () {
+    const KEY = '__ndp_mock_storage__';
+    const data = JSON.parse(localStorage.getItem(KEY) || '{}');
+    function persist() { localStorage.setItem(KEY, JSON.stringify(data)); }
+    window.chrome = {
+      storage: {
+        local: {
+          get(k, cb) {
+            setTimeout(() => {
+              if (k == null) cb({ ...data });
+              else if (Array.isArray(k)) { const o = {}; k.forEach(x => o[x] = data[x]); cb(o); }
+              else cb({ [k]: data[k] });
+            }, 0);
+          },
+          set(obj, cb) { Object.assign(data, obj); persist(); cb && setTimeout(cb, 0); },
+          remove(keys, cb) { (Array.isArray(keys) ? keys : [keys]).forEach(k => delete data[k]); persist(); cb && setTimeout(cb, 0); },
+          clear(cb) { Object.keys(data).forEach(k => delete data[k]); persist(); cb && setTimeout(cb, 0); },
+          _dump() { return data; }
+        }
+      }
+    };
+  })();
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { background: #e8eaf0; font-family: -apple-system, "PingFang SC", sans-serif; }

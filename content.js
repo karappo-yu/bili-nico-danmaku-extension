@@ -28,6 +28,7 @@
     panelY: null,
   };
   const STORAGE_KEY = 'nicoDmSettings';
+  const DANMAKU_KEY = 'nicoDmFiles'; // 弹幕文件记录: { [videoId]: { name, text, offset, ts } }
 
   // ---------- 工具: 数据格式探测 (同 IINA overlay/main.js) ----------
   function detectNicoFormat(arr) {
@@ -248,6 +249,8 @@
       data = loaded;
       currentFile = file.name;
       loadedVideoId = currentVideoId();
+      if (fileNameEl) fileNameEl.textContent = file.name;
+      saveDanmakuRecord(loadedVideoId, file.name, text); // 记住关联, 刷新后自动加载
       resyncDmTime();
       if (host) initEngine();
       else if (video) { mountHost(video); initEngine(); }
@@ -267,6 +270,71 @@
     fileInput.value = '';
     fileNameEl.textContent = '未选择文件';
     setStatus('');
+    removeDanmakuRecord(); // 清除 = 解除关联
+  }
+
+  // ---------- 弹幕文件关联记忆 ----------
+  // 选择文件时把内容存进 storage, 记住视频号 + 偏移; 刷新后自动加载
+  function saveDanmakuRecord(vid, name, text) {
+    if (!vid) return;
+    try {
+      chrome.storage.local.get(DANMAKU_KEY, (res) => {
+        const all = (res && res[DANMAKU_KEY]) || {};
+        all[vid] = { name, text, offset: settings.offset, ts: Date.now() };
+        chrome.storage.local.set({ [DANMAKU_KEY]: all });
+      });
+    } catch (e) {}
+  }
+
+  function updateDanmakuOffset() {
+    const vid = currentVideoId();
+    if (!vid) return;
+    try {
+      chrome.storage.local.get(DANMAKU_KEY, (res) => {
+        const all = (res && res[DANMAKU_KEY]) || {};
+        if (all[vid]) {
+          all[vid].offset = settings.offset;
+          chrome.storage.local.set({ [DANMAKU_KEY]: all });
+        }
+      });
+    } catch (e) {}
+  }
+
+  function removeDanmakuRecord() {
+    const vid = currentVideoId();
+    if (!vid) return;
+    try {
+      chrome.storage.local.get(DANMAKU_KEY, (res) => {
+        const all = (res && res[DANMAKU_KEY]) || {};
+        if (all[vid]) {
+          delete all[vid];
+          chrome.storage.local.set({ [DANMAKU_KEY]: all });
+        }
+      });
+    } catch (e) {}
+  }
+
+  // 刷新后自动加载: 当前视频有记录 → 恢复偏移 + 重新载入
+  let autoLoading = false;
+  function maybeAutoLoad() {
+    if (data || autoLoading) return;
+    const vid = currentVideoId();
+    if (!vid) return;
+    autoLoading = true;
+    try {
+      chrome.storage.local.get(DANMAKU_KEY, (res) => {
+        autoLoading = false;
+        const rec = res && res[DANMAKU_KEY] && res[DANMAKU_KEY][vid];
+        if (!rec || !rec.text) return;
+        settings.offset = Number(rec.offset) || 0;
+        saveSettings();
+        if (offsetEl) {
+          offsetEl.value = String(settings.offset);
+          offsetValEl.textContent = (settings.offset > 0 ? '+' : '') + settings.offset.toFixed(1) + 's';
+        }
+        loadFile(new File([rec.text], rec.name || 'auto-danmaku.json', { type: 'application/json' }));
+      });
+    } catch (e) { autoLoading = false; }
   }
 
   // ---------- 设置持久化 ----------
@@ -359,6 +427,7 @@
       lastVpos = -1;
       if (engine && video) { engine.clear(); engine.drawCanvas(vposOf(), true); }
       saveSettings();
+      updateDanmakuOffset(); // 记住偏移, 刷新后恢复
     });
     scaleEl.addEventListener('input', () => {
       settings.scale = parseFloat(scaleEl.value) / 100;
@@ -483,6 +552,7 @@
     const v = findVideo();
     if (!v) return;
     attach(v);
+    maybeAutoLoad(); // 刷新后自动加载该视频上次的弹幕文件
   }
 
   // ---------- SPA 观察 ----------
