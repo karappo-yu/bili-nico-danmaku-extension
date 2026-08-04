@@ -4,6 +4,8 @@
 
 选一个 nico 弹幕 JSON/XML 文件 → 弹幕以 niconico 风格叠加到 B 站视频上,支持时间轴偏移对齐。
 
+**中文** | [English](README.en.md) | [日本語](README.ja.md)
+
 ## 效果截图
 
 ![安达与岛村 · nico 弹幕满屏播放](png/nico-danmaku-1.png)
