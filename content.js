@@ -297,20 +297,26 @@
 
   let currentHandle = null; // 当前弹幕的本地文件句柄 (File System Access API)
 
+  // 解析弹幕文本 → 引擎数据 (loadFile 与切集预加载共用)
+  async function parseDanmakuText(text) {
+    const type = detectRawDanmakuType(text);
+    let loaded;
+    if (type === 'nico-json') {
+      loaded = JSON.parse(text);
+      format = detectNicoFormat(loaded);
+    } else {
+      const list = window.parseDanmaku(text, true);
+      format = 'formatted';
+      loaded = buildFormattedCanvasData(list, type);
+    }
+    if (!Array.isArray(loaded) || loaded.length === 0) throw new Error('弹幕数据为空');
+    return loaded;
+  }
+
   async function loadFile(file, handle) {
     try {
       const text = await file.text();
-      const type = detectRawDanmakuType(text);
-      let loaded;
-      if (type === 'nico-json') {
-        loaded = JSON.parse(text);
-        format = detectNicoFormat(loaded);
-      } else {
-        const list = window.parseDanmaku(text, true);
-        format = 'formatted';
-        loaded = buildFormattedCanvasData(list, type);
-      }
-      if (!Array.isArray(loaded) || loaded.length === 0) throw new Error('弹幕数据为空');
+      const loaded = await parseDanmakuText(text);
       data = loaded;
       currentFile = file.name;
       currentHandle = handle || null;
@@ -494,6 +500,51 @@
         } catch (e) { fromContent(); }
       }).catch(fromContent);
     } catch (e) { settle(); }
+  }
+
+  // 切集预加载: 检测到视频身份变化后, 先异步查记录+解析新弹幕,
+  // ready 后在同一时刻直接替换 (不清空状态/不留空白间隙),
+  // 状态行从旧绿字直接变新绿字; 新视频无关联时才清弹幕
+  let switching = false;
+  function handleVideoSwitch() {
+    if (!(data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) || switching) return;
+    const newVid = currentVideoId();
+    switching = true;
+    try {
+      chrome.storage.local.get(DANMAKU_KEY, (res) => {
+        const rec = lookupRecord(res && res[DANMAKU_KEY], newVid);
+        if (!rec || !rec.text) {
+          // 新视频无关联 → 清旧弹幕, 延迟确认后提示
+          switching = false;
+          clearDanmaku();
+          setTimeout(() => {
+            if (data || currentVideoId() !== newVid) return;
+            setStatus('未找到该视频的关联弹幕, 请选择文件', 'err');
+          }, 2000);
+          return;
+        }
+        parseDanmakuText(rec.text).then((loaded) => {
+          if (currentVideoId() !== newVid || loadedVideoId === null) { switching = false; return; } // 又切走或被手动清除
+          // 一次性替换: 旧弹幕引擎销毁 + 新数据就位 (同一时刻)
+          destroyEngine();
+          data = loaded;
+          currentFile = rec.name;
+          currentHandle = null;
+          loadedVideoId = newVid;
+          if (fileNameEl) fileNameEl.textContent = rec.name;
+          applyStoredOffset(newVid);
+          resyncDmTime();
+          if (host) initEngine();
+          else if (video) { mountHost(video); initEngine(); }
+          setStatus(rec.name + ' · ' + countComments(data) + ' 条', true);
+          switching = false;
+        }).catch((e) => {
+          switching = false;
+          clearDanmaku();
+          setStatus('载入失败: ' + e.message, false);
+        });
+      });
+    } catch (e) { switching = false; clearDanmaku(); }
   }
 
   // ---------- 设置持久化 ----------
@@ -690,7 +741,7 @@
     bindVideoEvents(v);
     resyncDmTime();
     if (videoChanged) {
-      clearDanmaku(); // 状态由后续 maybeAutoLoad 决定
+      // 不在此清除: 由 resolve 的 handleVideoSwitch 预加载新弹幕后一次性替换
     }
     mountHost(v);
     if (data) initEngine();
@@ -712,9 +763,9 @@
     if (!panel) buildPanel();
     else panel.style.display = '';
     // 视频身份变化检查: B 站切 P 常复用 video 元素 (attach 会提前 return),
-    // 这里先清弹幕, 不等 1.5s 轮询
+    // 预加载新弹幕 ready 后一次性替换 (无清除间隙), 不等 1.5s 轮询
     if (data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) {
-      clearDanmaku();
+      handleVideoSwitch();
     }
     const v = findVideo();
     if (!v) return;
@@ -735,11 +786,9 @@
 
     setInterval(() => {
       if (!isPlayerPage()) { teardownAll(); return; }
-      // 同元素换源 (URL 变了但 video 元素没换) 也要清弹幕
+      // 同元素换源 (URL 变了但 video 元素没换) 也要处理
       if (data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) {
-        clearDanmaku();
-        // 不显示'视频已切换'过渡灰字: 状态直接由 maybeAutoLoad 结果决定 (绿=已加载/红=未找到)
-        maybeAutoLoad(); // 切集后自动加载新视频的弹幕 (SPA 下 video 元素复用, resolve 可能不触发)
+        handleVideoSwitch(); // 预加载后一次性替换, 无清除间隙
         return;
       }
       if (!video) { resolve(); return; }
