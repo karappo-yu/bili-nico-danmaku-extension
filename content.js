@@ -690,8 +690,7 @@
     bindVideoEvents(v);
     resyncDmTime();
     if (videoChanged) {
-      clearDanmaku();
-      setStatus('视频已切换, 弹幕已清除');
+      clearDanmaku(); // 状态由后续 maybeAutoLoad 决定
     }
     mountHost(v);
     if (data) initEngine();
@@ -712,10 +711,15 @@
     }
     if (!panel) buildPanel();
     else panel.style.display = '';
+    // 视频身份变化检查: B 站切 P 常复用 video 元素 (attach 会提前 return),
+    // 这里先清弹幕, 不等 1.5s 轮询
+    if (data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) {
+      clearDanmaku();
+    }
     const v = findVideo();
     if (!v) return;
     attach(v);
-    maybeAutoLoad(); // 刷新后自动加载该视频上次的弹幕文件
+    maybeAutoLoad(); // 刷新/切集后自动加载该视频的弹幕
   }
 
   // ---------- SPA 观察 ----------
@@ -734,7 +738,7 @@
       // 同元素换源 (URL 变了但 video 元素没换) 也要清弹幕
       if (data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) {
         clearDanmaku();
-        setStatus('视频已切换, 弹幕已清除');
+        // 不显示'视频已切换'过渡灰字: 状态直接由 maybeAutoLoad 结果决定 (绿=已加载/红=未找到)
         maybeAutoLoad(); // 切集后自动加载新视频的弹幕 (SPA 下 video 元素复用, resolve 可能不触发)
         return;
       }
