@@ -324,7 +324,6 @@
   }
 
   function clearDanmaku() {
-    const vid = currentVideoId();
     destroyEngine();
     data = null;
     currentFile = null;
@@ -333,8 +332,16 @@
     fileInput.value = '';
     fileNameEl.textContent = '未选择文件';
     setStatus('');
-    removeDanmakuRecord(); // 清除 = 解除关联
-    if (vid) idbDelete(vid).catch(() => {}); // 文件句柄一起删
+    // 注意: 不删关联记录! 切集自动清除时 URL 已是新视频,
+    // 若在这里删记录会误删新视频的关联 (死逻辑)。删除只发生在手动清除。
+  }
+
+  // 手动清除 = 清弹幕 + 解除当前视频的关联 (记录 + 句柄)
+  function clearDanmakuAndRecord() {
+    const vid = currentVideoId();
+    clearDanmaku();
+    removeDanmakuRecord();
+    if (vid) idbDelete(vid).catch(() => {});
   }
 
   // ---------- 弹幕文件关联记忆 ----------
@@ -543,7 +550,7 @@
       if (canvas) canvas.style.opacity = String(settings.opacity);
       saveSettings();
     });
-    $('#ndp-clear').addEventListener('click', clearDanmaku);
+    $('#ndp-clear').addEventListener('click', clearDanmakuAndRecord);
     panel.querySelector('.ndp-collapse').addEventListener('click', () => {
       panel.classList.toggle('ndp-collapsed');
     });
@@ -695,7 +702,7 @@
       if (m.type === 'nico-dm:load' && typeof m.text === 'string') {
         loadFile(new File([m.text], m.name || 'debug-danmaku.json', { type: 'application/json' }));
       } else if (m.type === 'nico-dm:clear') {
-        clearDanmaku();
+        clearDanmakuAndRecord();
       }
     });
   }
