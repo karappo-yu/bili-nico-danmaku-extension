@@ -140,10 +140,7 @@
   }
 
   function vposOf(v) {
-    // 浮点 vpos + 锚定外推 (同 IINA 插件 canvasSyncAnchor 方案):
-    // video.currentTime 只随媒体帧更新 (24/30fps), 直接用会顿挫;
-    // 锚定后按 performance.now() 外推, 弹幕以 rAF 频率平滑移动
-    return (effectiveVideoTime() + settings.offset) * 100;
+    return (dmTime + settings.offset) * 100;
   }
 
   // ---------- 引擎生命周期 ----------
@@ -174,7 +171,7 @@
     bindEngineEvents(engine);
 
     lastVpos = -1;
-    if (video) engine.drawCanvas(vposOf(video), true);
+    if (video) engine.drawCanvas(vposOf(), true);
     setStatus('已载入 ' + countComments(data) + ' 条', true);
   }
 
@@ -194,28 +191,28 @@
     });
   }
 
-  // ---------- 同步循环 (锚定 + 外推) ----------
-  let anchorVideoTime = 0;
-  let anchorSysTime = 0;
-  let lastMediaTime = -1;
+  // ---------- 同步循环 (nico-comment-dl 式: rAF dt 累积时钟) ----------
+  // 播放/seek/恢复时对锚到 video.currentTime, 中间自由运行,
+  // 不做逐媒体帧校正 (媒体时钟本身有抖动, 校正反而造成微跳)
+  let dmTime = 0;            // 弹幕时钟 (秒)
+  let lastFrameTime = null;  // 上一帧 rAF 时间戳
   let stalled = false;
 
-  function syncAnchor(t) {
-    anchorVideoTime = t;
-    anchorSysTime = performance.now();
-    lastMediaTime = t;
+  function resyncDmTime() {
+    if (!video) return;
+    dmTime = video.currentTime;
+    lastFrameTime = null; // 防 dt 跳变
+    lastVpos = -1;        // 触发重绘
   }
 
-  function effectiveVideoTime() {
-    if (video.paused || stalled) return anchorVideoTime;
-    return anchorVideoTime + ((performance.now() - anchorSysTime) / 1000) * (video.playbackRate || 1);
-  }
-
-  function loop() {
+  function loop(now) {
     rafId = requestAnimationFrame(loop);
     if (!engine || !video || !data) return;
-    if (video.currentTime !== lastMediaTime) syncAnchor(video.currentTime);
-    const vpos = vposOf(video);
+    if (lastFrameTime === null) { lastFrameTime = now; return; }
+    const dt = (now - lastFrameTime) / 1000;
+    lastFrameTime = now;
+    if (!video.paused && !stalled) dmTime += dt * (video.playbackRate || 1);
+    const vpos = vposOf();
     const isSeek = Math.abs(vpos - lastVpos) > 150;
     if (video.paused) {
       // 暂停: 保留最后一帧, 只在 seek 时重绘
@@ -251,6 +248,7 @@
       data = loaded;
       currentFile = file.name;
       loadedVideoId = currentVideoId();
+      resyncDmTime();
       if (host) initEngine();
       else if (video) { mountHost(video); initEngine(); }
       setStatus(file.name + ' · ' + countComments(data) + ' 条', true);
@@ -359,7 +357,7 @@
       settings.offset = parseFloat(offsetEl.value);
       offsetValEl.textContent = (settings.offset > 0 ? '+' : '') + settings.offset.toFixed(1) + 's';
       lastVpos = -1;
-      if (engine && video) { engine.clear(); engine.drawCanvas(vposOf(video), true); }
+      if (engine && video) { engine.clear(); engine.drawCanvas(vposOf(), true); }
       saveSettings();
     });
     scaleEl.addEventListener('input', () => {
@@ -428,6 +426,8 @@
     v.addEventListener('loadeddata', onLoadedData);
     v.addEventListener('waiting', onWaiting);
     v.addEventListener('playing', onPlaying);
+    v.addEventListener('seeked', onSeeked);
+    v.addEventListener('ratechange', onRateChange);
   }
 
   function unbindVideoEvents(v) {
@@ -436,13 +436,17 @@
     v.removeEventListener('loadeddata', onLoadedData);
     v.removeEventListener('waiting', onWaiting);
     v.removeEventListener('playing', onPlaying);
+    v.removeEventListener('seeked', onSeeked);
+    v.removeEventListener('ratechange', onRateChange);
   }
 
   function onWaiting() { stalled = true; }
-  function onPlaying() { stalled = false; syncAnchor(video.currentTime); }
+  function onPlaying() { stalled = false; resyncDmTime(); }
+  function onSeeked() { resyncDmTime(); }
+  function onRateChange() { resyncDmTime(); }
 
   function onEmptied() { if (engine) engine.clear(); lastVpos = -1; }
-  function onLoadedData() { lastVpos = -1; }
+  function onLoadedData() { resyncDmTime(); }
 
   // ---------- 挂载/重挂载 ----------
   function attach(v) {
@@ -452,8 +456,7 @@
     unbindVideoEvents(video);
     video = v;
     bindVideoEvents(v);
-    syncAnchor(v.currentTime);
-    lastVpos = -1;
+    resyncDmTime();
     if (videoChanged) {
       clearDanmaku();
       setStatus('视频已切换, 弹幕已清除');
@@ -511,7 +514,7 @@
     await loadSettings();
     resolve(); // 仅在视频页创建面板
     startObservers();
-    loop();
+    loop(performance.now());
     // 调试/自动化钩子: postMessage({type:'nico-dm:load', name, text}) 或 {type:'nico-dm:clear'}
     window.addEventListener('message', (e) => {
       const m = e.data;
