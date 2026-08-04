@@ -281,7 +281,12 @@
       try {
         chrome.storage.local.get(STORAGE_KEY, (res) => {
           const s = res && res[STORAGE_KEY];
-          if (s) Object.assign(settings, s);
+          if (s) {
+            Object.assign(settings, s);
+            // 钳制旧设置 (字号 0.5-1.0, 透明度 0.1-1)
+            settings.scale = Math.min(Math.max(settings.scale, 0.5), 1.0);
+            settings.opacity = Math.min(Math.max(settings.opacity, 0.1), 1);
+          }
           resolve();
         });
       } catch (e) { resolve(); }
@@ -313,7 +318,7 @@
         </div>
         <div class="ndp-row">
           <label class="ndp-label">字号</label>
-          <input type="range" id="ndp-scale" min="50" max="200" step="5" value="100">
+          <input type="range" id="ndp-scale" min="50" max="100" step="5" value="100">
           <span class="ndp-val" id="ndp-scale-val">1.0×</span>
         </div>
         <div class="ndp-row">
