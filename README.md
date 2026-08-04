@@ -49,6 +49,11 @@
 
 ```bash
 cd bili-nico-danmaku-extension
+# 首次需要生成测试视频 (gitignore, 不入库)
+ffmpeg -y -f lavfi -i testsrc2=size=960x540:rate=30:duration=90 \
+  -f lavfi -i sine=frequency=440:duration=90 \
+  -c:v libx264 -pix_fmt yuv420p -preset ultrafast -crf 32 -c:a aac -b:a 96k \
+  test/harness/test.mp4
 python3 -m http.server 8765
 # 打开 http://127.0.0.1:8765/video/index.html (video/ 是指向测试台的符号链接,模拟 /video/ URL 形态)
 ```
