@@ -28,7 +28,46 @@
     panelY: null,
   };
   const STORAGE_KEY = 'nicoDmSettings';
-  const DANMAKU_KEY = 'nicoDmFiles'; // 弹幕文件记录: { [videoId]: { name, text, offset, ts } }
+  const DANMAKU_KEY = 'nicoDmFiles'; // 弹幕文件记录: { [videoId]: { name, text?, offset, ts, source } }
+  // source: 'handle' = 本地文件句柄 (IDB, 直接读盘, 不占 storage); 'content' = 文件内容 (storage, fallback)
+
+  // ---------- IndexedDB: 本地文件句柄持久化 ----------
+  // FileSystemFileHandle 存这里 (chrome.storage 存不了), 下次直接打开文件不用再选
+  const IDB_NAME = 'nicoDm', IDB_STORE = 'handles';
+  function idbOpen() {
+    return new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open(IDB_NAME, 1);
+        r.onupgradeneeded = () => r.result.createObjectStore(IDB_STORE);
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+  }
+  function idbPut(key, val) {
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).put(val, key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
+  function idbGet(key) {
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const q = tx.objectStore(IDB_STORE).get(key);
+      q.onsuccess = () => res(q.result || null);
+      q.onerror = () => rej(q.error);
+    }));
+  }
+  function idbDelete(key) {
+    return idbOpen().then(db => new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    }));
+  }
 
   // ---------- 工具: 数据格式探测 (同 IINA overlay/main.js) ----------
   function detectNicoFormat(arr) {
@@ -232,7 +271,28 @@
     return d.length;
   }
 
-  async function loadFile(file) {
+  // 选择弹幕文件: 优先 File System Access API (拿文件句柄, 下次直接打开该文件), 否则 input[type=file]
+  async function pickFile() {
+    if (typeof window.showOpenFilePicker === 'function') {
+      try {
+        const [handle] = await window.showOpenFilePicker({
+          types: [{ description: '弹幕文件', accept: { 'application/json': ['.json'], 'text/xml': ['.xml'] } }],
+          multiple: false
+        });
+        const file = await handle.getFile();
+        await loadFile(file, handle);
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return; // 用户取消
+        // 其他错误 → 回退 input
+      }
+    }
+    fileInput.click();
+  }
+
+  let currentHandle = null; // 当前弹幕的本地文件句柄 (File System Access API)
+
+  async function loadFile(file, handle) {
     try {
       const text = await file.text();
       const type = detectRawDanmakuType(text);
@@ -248,9 +308,10 @@
       if (!Array.isArray(loaded) || loaded.length === 0) throw new Error('弹幕数据为空');
       data = loaded;
       currentFile = file.name;
+      currentHandle = handle || null;
       loadedVideoId = currentVideoId();
       if (fileNameEl) fileNameEl.textContent = file.name;
-      saveDanmakuRecord(loadedVideoId, file.name, text); // 记住关联, 刷新后自动加载
+      await saveDanmakuRecord(loadedVideoId, file.name, text, currentHandle); // 记住关联, 刷新后自动加载
       resyncDmTime();
       if (host) initEngine();
       else if (video) { mountHost(video); initEngine(); }
@@ -263,26 +324,42 @@
   }
 
   function clearDanmaku() {
+    const vid = currentVideoId();
     destroyEngine();
     data = null;
     currentFile = null;
+    currentHandle = null;
     loadedVideoId = null;
     fileInput.value = '';
     fileNameEl.textContent = '未选择文件';
     setStatus('');
     removeDanmakuRecord(); // 清除 = 解除关联
+    if (vid) idbDelete(vid).catch(() => {}); // 文件句柄一起删
   }
 
   // ---------- 弹幕文件关联记忆 ----------
-  // 选择文件时把内容存进 storage, 记住视频号 + 偏移; 刷新后自动加载
-  function saveDanmakuRecord(vid, name, text) {
+  // 选择文件时记住视频号 + 偏移; 刷新后自动加载
+  // handle 模式: 本地文件句柄存 IDB (直接读盘, 不占 storage); content 模式: 文件内容存 storage (fallback)
+  async function saveDanmakuRecord(vid, name, text, handle) {
     if (!vid) return;
     try {
-      chrome.storage.local.get(DANMAKU_KEY, (res) => {
-        const all = (res && res[DANMAKU_KEY]) || {};
-        all[vid] = { name, text, offset: settings.offset, ts: Date.now() };
-        chrome.storage.local.set({ [DANMAKU_KEY]: all });
-      });
+      if (handle) {
+        try { await idbPut(vid, handle); } catch (e) { handle = null; } // IDB 存句柄失败 → 降级内容模式
+      }
+      if (handle) {
+        chrome.storage.local.get(DANMAKU_KEY, (res) => {
+          const all = (res && res[DANMAKU_KEY]) || {};
+          all[vid] = { name, offset: settings.offset, ts: Date.now(), source: 'handle' };
+          chrome.storage.local.set({ [DANMAKU_KEY]: all });
+        });
+      } else {
+        chrome.storage.local.get(DANMAKU_KEY, (res) => {
+          const all = (res && res[DANMAKU_KEY]) || {};
+          all[vid] = { name, text, offset: settings.offset, ts: Date.now(), source: 'content' };
+          chrome.storage.local.set({ [DANMAKU_KEY]: all });
+        });
+        idbDelete(vid).catch(() => {});
+      }
     } catch (e) {}
   }
 
@@ -314,26 +391,51 @@
     } catch (e) {}
   }
 
-  // 刷新后自动加载: 当前视频有记录 → 恢复偏移 + 重新载入
+  // 从 storage 恢复该视频的偏移量并同步滑块
+  function applyStoredOffset(vid) {
+    try {
+      chrome.storage.local.get(DANMAKU_KEY, (res) => {
+        const rec = res && res[DANMAKU_KEY] && res[DANMAKU_KEY][vid];
+        settings.offset = Number(rec && rec.offset) || 0;
+        saveSettings();
+        if (offsetEl) {
+          offsetEl.value = String(settings.offset);
+          offsetValEl.textContent = (settings.offset > 0 ? '+' : '') + settings.offset.toFixed(1) + 's';
+        }
+      });
+    } catch (e) {}
+  }
+
+  // 刷新/切集后自动加载: 本地文件句柄 (IDB) 优先, 其次 storage 内容记录
   let autoLoading = false;
   function maybeAutoLoad() {
     if (data || autoLoading) return;
     const vid = currentVideoId();
     if (!vid) return;
     autoLoading = true;
+    const fromContent = () => {
+      try {
+        chrome.storage.local.get(DANMAKU_KEY, (res) => {
+          const rec = res && res[DANMAKU_KEY] && res[DANMAKU_KEY][vid];
+          autoLoading = false;
+          if (!rec || !rec.text) return;
+          applyStoredOffset(vid);
+          loadFile(new File([rec.text], rec.name || 'auto-danmaku.json', { type: 'application/json' }));
+        });
+      } catch (e) { autoLoading = false; }
+    };
     try {
-      chrome.storage.local.get(DANMAKU_KEY, (res) => {
-        autoLoading = false;
-        const rec = res && res[DANMAKU_KEY] && res[DANMAKU_KEY][vid];
-        if (!rec || !rec.text) return;
-        settings.offset = Number(rec.offset) || 0;
-        saveSettings();
-        if (offsetEl) {
-          offsetEl.value = String(settings.offset);
-          offsetValEl.textContent = (settings.offset > 0 ? '+' : '') + settings.offset.toFixed(1) + 's';
-        }
-        loadFile(new File([rec.text], rec.name || 'auto-danmaku.json', { type: 'application/json' }));
-      });
+      idbGet(vid).then(async (handle) => {
+        if (!handle) { fromContent(); return; }
+        try {
+          const st = await handle.requestPermission({ mode: 'read' });
+          if (st !== 'granted') { fromContent(); return; }
+          const f = await handle.getFile();
+          autoLoading = false;
+          applyStoredOffset(vid);
+          loadFile(f, handle); // 直接从磁盘读最新内容
+        } catch (e) { fromContent(); }
+      }).catch(fromContent);
     } catch (e) { autoLoading = false; }
   }
 
@@ -416,7 +518,7 @@
     opacityEl = $('#ndp-opacity');
     opacityValEl = $('#ndp-opacity-val');
 
-    $('#ndp-pick').addEventListener('click', () => fileInput.click());
+    $('#ndp-pick').addEventListener('click', pickFile);
     fileInput.addEventListener('change', () => {
       if (fileInput.files && fileInput.files[0]) loadFile(fileInput.files[0]);
     });
@@ -572,6 +674,7 @@
       if (data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) {
         clearDanmaku();
         setStatus('视频已切换, 弹幕已清除');
+        maybeAutoLoad(); // 切集后自动加载新视频的弹幕 (SPA 下 video 元素复用, resolve 可能不触发)
         return;
       }
       if (!video) { resolve(); return; }

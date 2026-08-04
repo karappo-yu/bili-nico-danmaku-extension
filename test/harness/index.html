@@ -28,6 +28,21 @@
         }
       }
     };
+    // ===== showOpenFilePicker mock: 返回可被 IDB 克隆的 fake handle =====
+    // 记录调用次数: 自动加载从 handle 读文件时不应再弹 picker
+    window.__pickCount = 0;
+    window.showOpenFilePicker = async () => {
+      window.__pickCount++;
+      const d = await (await fetch('/test-data/sample-nico.json')).json();
+      const file = new File([JSON.stringify(d)], 'picked-sample.json', { type: 'application/json' });
+      return [{
+        name: file.name,
+        kind: 'file',
+        getFile: async () => file,
+        queryPermission: async () => 'granted',
+        requestPermission: async () => 'granted'
+      }];
+    };
   })();
 </script>
 <style>
