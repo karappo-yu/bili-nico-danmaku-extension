@@ -13,9 +13,9 @@
 ## 使用
 
 1. 点「📂 选择弹幕文件」载入弹幕文件
-2. 播放视频,弹幕随 `video.currentTime` 同步
+2. 播放视频,弹幕随视频平滑同步(锚定 + performance.now() 外推,不受视频帧率限制)
 3. B 站源与 nico 原视频时间轴不一致时,拖「偏移」滑块对齐(正=弹幕提前,负=延后)
-4. 「隐藏B站弹幕」默认开启;字号/透明度即时生效
+4. 字号/透明度即时生效;B 站原生弹幕用播放器自带的弹幕开关控制
 
 设置(偏移、字号、透明度、面板位置)存 `chrome.storage.local`,下次自动恢复。
 
@@ -32,7 +32,7 @@
 ## 架构
 
 - `content.js` — 播放器解析、overlay 挂载、文件载入、rAF 同步循环、偏移/字号/透明度、SPA 重挂载(MutationObserver);仅在视频页(/video/、/bangumi/play/、/list/)创建面板
-- `content.css` — 面板 UI + 隐藏 B 站原生弹幕规则
+- `content.css` — 面板 UI
 - `lib/bundle.js` — niconicomments v0.3.1 上游原版 bundle(来自 nico-comment-dl/vendor/niconicomments,含 CSSRenderer),零修改复用
 - `lib/input.js` — XML/JSON 解析(同 iina-plugin-danmaku-cosmos)
 - `test-data/sample-nico.json` — 68 条 v1 格式测试弹幕
@@ -62,6 +62,7 @@ python3 -m http.server 8765
 
 ## 已知限制
 
-- B 站原生弹幕隐藏靠 CSS 选择器(`.bpx-player-dm` 等),B 站改版后若失效需更新 `content.css`
+- 弹幕同步用视频时间锚定 + 外推;视频缓冲卡顿(waiting)时弹幕冻结,恢复播放(playing)后重新对齐
 - 全屏时面板在 fullscreen 元素外会被隐藏(弹幕本身跟随播放器正常全屏)
 - CA 弹幕的 `@jump` 跳转忽略(浏览器端无多视频切换语义)
+- 原生 B 站弹幕不处理:用播放器自带的弹幕开关控制

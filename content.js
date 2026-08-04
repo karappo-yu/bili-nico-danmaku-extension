@@ -23,7 +23,6 @@
     offset: 0,       // 秒
     scale: 1.0,
     opacity: 0.85,
-    hideNative: true,
     panelX: null,
     panelY: null,
   };
@@ -127,7 +126,10 @@
   }
 
   function vposOf(v) {
-    return Math.floor((v.currentTime + settings.offset) * 100);
+    // 浮点 vpos + 锚定外推 (同 IINA 插件 canvasSyncAnchor 方案):
+    // video.currentTime 只随媒体帧更新 (24/30fps), 直接用会顿挫;
+    // 锚定后按 performance.now() 外推, 弹幕以 rAF 频率平滑移动
+    return (effectiveVideoTime() + settings.offset) * 100;
   }
 
   // ---------- 引擎生命周期 ----------
@@ -178,10 +180,27 @@
     });
   }
 
-  // ---------- 同步循环 ----------
+  // ---------- 同步循环 (锚定 + 外推) ----------
+  let anchorVideoTime = 0;
+  let anchorSysTime = 0;
+  let lastMediaTime = -1;
+  let stalled = false;
+
+  function syncAnchor(t) {
+    anchorVideoTime = t;
+    anchorSysTime = performance.now();
+    lastMediaTime = t;
+  }
+
+  function effectiveVideoTime() {
+    if (video.paused || stalled) return anchorVideoTime;
+    return anchorVideoTime + ((performance.now() - anchorSysTime) / 1000) * (video.playbackRate || 1);
+  }
+
   function loop() {
     rafId = requestAnimationFrame(loop);
     if (!engine || !video || !data) return;
+    if (video.currentTime !== lastMediaTime) syncAnchor(video.currentTime);
     const vpos = vposOf(video);
     const isSeek = Math.abs(vpos - lastVpos) > 150;
     if (video.paused) {
@@ -255,7 +274,7 @@
 
   // ---------- UI ----------
   let panel, fileInput, fileNameEl, statusEl;
-  let offsetEl, offsetValEl, scaleEl, scaleValEl, opacityEl, opacityValEl, hideNativeEl;
+  let offsetEl, offsetValEl, scaleEl, scaleValEl, opacityEl, opacityValEl;
 
   function buildPanel() {
     if (panel) return;
@@ -286,10 +305,6 @@
           <input type="range" id="ndp-opacity" min="10" max="100" step="5" value="85">
           <span class="ndp-val" id="ndp-opacity-val">0.85</span>
         </div>
-        <div class="ndp-row">
-          <label class="ndp-label">隐藏B站弹幕</label>
-          <input type="checkbox" id="ndp-hide-native" checked>
-        </div>
         <div class="ndp-actions">
           <button class="ndp-btn" id="ndp-clear">清除弹幕</button>
         </div>
@@ -313,7 +328,6 @@
     scaleValEl = $('#ndp-scale-val');
     opacityEl = $('#ndp-opacity');
     opacityValEl = $('#ndp-opacity-val');
-    hideNativeEl = $('#ndp-hide-native');
 
     $('#ndp-pick').addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', () => {
@@ -337,11 +351,6 @@
       settings.opacity = parseFloat(opacityEl.value) / 100;
       opacityValEl.textContent = settings.opacity.toFixed(2);
       if (canvas) canvas.style.opacity = String(settings.opacity);
-      saveSettings();
-    });
-    hideNativeEl.addEventListener('change', () => {
-      settings.hideNative = hideNativeEl.checked;
-      applyHideNative();
       saveSettings();
     });
     $('#ndp-clear').addEventListener('click', clearDanmaku);
@@ -379,7 +388,6 @@
     scaleValEl.textContent = settings.scale.toFixed(2) + '×';
     opacityEl.value = String(settings.opacity * 100);
     opacityValEl.textContent = settings.opacity.toFixed(2);
-    hideNativeEl.checked = settings.hideNative;
     if (settings.panelX !== null) {
       panel.style.left = settings.panelX + 'px';
       panel.style.top = settings.panelY + 'px';
@@ -393,33 +401,35 @@
     statusEl.className = 'ndp-status' + (ok ? ' ndp-ok' : msg ? ' ndp-err' : '');
   }
 
-  function applyHideNative() {
-    const root = document.documentElement;
-    if (settings.hideNative) root.setAttribute('data-nico-hide-bili', '');
-    else root.removeAttribute('data-nico-hide-bili');
-  }
-
   // ---------- 视频事件 ----------
   function bindVideoEvents(v) {
     v.addEventListener('emptied', onEmptied);
     v.addEventListener('loadeddata', onLoadedData);
+    v.addEventListener('waiting', onWaiting);
+    v.addEventListener('playing', onPlaying);
   }
 
   function unbindVideoEvents(v) {
     if (!v) return;
     v.removeEventListener('emptied', onEmptied);
     v.removeEventListener('loadeddata', onLoadedData);
+    v.removeEventListener('waiting', onWaiting);
+    v.removeEventListener('playing', onPlaying);
   }
+
+  function onWaiting() { stalled = true; }
+  function onPlaying() { stalled = false; syncAnchor(video.currentTime); }
 
   function onEmptied() { if (engine) engine.clear(); lastVpos = -1; }
   function onLoadedData() { lastVpos = -1; }
 
   // ---------- 挂载/重挂载 ----------
   function attach(v) {
-    if (video === v) { applyHideNative(); return; }
+    if (video === v) return;
     unbindVideoEvents(video);
     video = v;
     bindVideoEvents(v);
+    syncAnchor(v.currentTime);
     lastVpos = -1;
     mountHost(v);
     if (data) initEngine();
@@ -466,7 +476,6 @@
   // ---------- 启动 ----------
   async function boot() {
     await loadSettings();
-    applyHideNative();
     resolve(); // 仅在视频页创建面板
     startObservers();
     loop();

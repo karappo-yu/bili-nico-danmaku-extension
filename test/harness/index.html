@@ -58,7 +58,7 @@
     <p style="margin-top:12px;color:#666;font-size:12px">
       测试步骤: ① 点右上角「选择弹幕文件」加载 <code>extension/test-data/sample-nico.json</code>
       (自动化: 控制台 <code>window.postMessage({type:'nico-dm:load', name:'sample.json', text:JSON.stringify(SAMPLE)}, '*')</code>)
-      ② 播放视频看弹幕 ③ 拖偏移滑块 ④ 取消勾选"隐藏B站弹幕"看原生层回来
+      ② 播放视频看弹幕(应平滑 60fps 滚动) ③ 拖偏移滑块 ④ 原生弹幕层保持可见(隐藏由B站播放器自己管)
     </p>
   </div>
 

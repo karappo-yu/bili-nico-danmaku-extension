@@ -114,12 +114,3 @@
 }
 #nico-dm-panel .ndp-status.ndp-err { color: #f87171; }
 #nico-dm-panel .ndp-status.ndp-ok { color: #4ade80; }
-
-/* ============ 隐藏 B 站原生弹幕 ============ */
-html[data-nico-hide-bili] .bpx-player-dm,
-html[data-nico-hide-bili] .bpx-player-dm-wrap,
-html[data-nico-hide-bili] .danmaku-box,
-html[data-nico-hide-bili] #bilibili-player .bilibili-player-video-danmaku,
-html[data-nico-hide-bili] .bilibili-player-video-danmaku {
-  display: none !important;
-}
