@@ -4,6 +4,12 @@
 
 选一个 nico 弹幕 JSON/XML 文件 → 弹幕以 niconico 风格叠加到 B 站视频上,支持时间轴偏移对齐。
 
+## 效果截图
+
+![安达与岛村 · nico 弹幕满屏播放](png/nico-danmaku-1.png)
+
+![DECO*27 Marshmallow · 载入 2500 条弹幕](png/nico-danmaku-2.png)
+
 ## 安装
 
 1. Chrome → `chrome://extensions` → 打开「开发者模式」
