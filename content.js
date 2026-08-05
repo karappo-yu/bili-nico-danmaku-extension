@@ -875,13 +875,15 @@
           <input type="range" id="ndp-opacity" min="10" max="100" step="5" value="85">
           <span class="ndp-val" id="ndp-opacity-val">0.85</span>
         </div>
-        <div class="ndp-row">
-          <label class="ndp-label">显示弹幕</label>
-          <input type="checkbox" id="ndp-visible" checked>
-        </div>
-        <div class="ndp-row">
-          <label class="ndp-label">自动映射</label>
-          <input type="checkbox" id="ndp-automap" checked title="打开有映射的视频时自动下载对应 nico 弹幕">
+        <div class="ndp-row ndp-row-split">
+          <span class="ndp-toggle-item">
+            <label class="ndp-label">显示弹幕</label>
+            <input type="checkbox" id="ndp-visible" checked>
+          </span>
+          <span class="ndp-toggle-item">
+            <label class="ndp-label">自动映射</label>
+            <input type="checkbox" id="ndp-automap" checked title="打开有映射的视频时自动下载对应 nico 弹幕">
+          </span>
         </div>
         <div class="ndp-actions">
           <button class="ndp-btn" id="ndp-clear">清除弹幕</button>
