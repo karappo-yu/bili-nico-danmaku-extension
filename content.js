@@ -624,7 +624,7 @@
     if (targetVid && currentVideoId() !== targetVid) return;
     const info = document.getElementById('ndp-sm-info');
     if (info) {
-      info.textContent = '自动映射: 《' + (m.bTitle || '?') + '》 ↔ 《' + (m.nTitle || m.sm) + '》';
+      info.textContent = '自动映射: 《' + (m.nTitle || m.sm) + '》';
       info.className = 'ndp-nico-info ndp-ok';
     }
   }
@@ -841,7 +841,7 @@
               lookupMapping(mapKey).then((m) => {
                 const el = document.getElementById('ndp-sm-info');
                 if (!el) return;
-                if (m) { el.textContent = '自动映射: 《' + (m.bTitle || '?') + '》 ↔ 《' + (m.nTitle || m.sm) + '》'; el.className = 'ndp-nico-info ndp-ok'; }
+                if (m) { el.textContent = '自动映射: 《' + (m.nTitle || m.sm) + '》'; el.className = 'ndp-nico-info ndp-ok'; }
                 else { el.textContent = ''; el.className = 'ndp-nico-info'; }
               }).catch(() => {});
             }
