@@ -25,7 +25,30 @@ Pick a nico danmaku JSON/XML file → the comments are overlaid on the Bilibili 
 3. If the Bilibili source and the original nico video timelines differ, drag the **Offset** slider to align (positive = comments earlier, negative = later)
 4. Font size / opacity apply immediately; native Bilibili comments are controlled by the player's own danmaku toggle
 5. **Show danmaku** toggle: temporarily hide/show nico comments (keeps the video↔file association; unlike **Clear danmaku**)
-6. **niconico curated comments**: enter a video ID or URL (e.g. `sm9` / `https://www.nicovideo.jp/watch/sm9`) → **Download curated comments** fetches the video's curated comments and **caches them locally** (next time reads from cache); **Refresh cache** forces a fresh download. If you're logged into niconico in this browser, the login session (`user_session`) is used automatically — login/paid-only comments work too; otherwise anonymous public comments only
+6. **niconico curated comments**: enter a video ID or URL (e.g. `sm9` / `https://www.nicovideo.jp/watch/sm9`) → the video's curated comments are fetched and **cached locally**. The button adapts: new ID → **Download curated comments**; already downloaded → **Redownload** (forces a fresh fetch). If you're logged into niconico in this browser, the login session (`user_session`) is used automatically — login/paid-only comments work too; otherwise anonymous public comments only
+7. **Auto-map nico video IDs** (off by default): when a video has an entry in the mapping table, its nico comments are downloaded automatically and the nico title is shown in the panel for verification. Mapping data is still small — enable manually when needed
+
+### Mapping table
+
+- **Shared table**: [mappings.json](mappings.json) (GitHub repo; bundled into the extension + remote incremental merge, 10-min cache), **manually maintained** — add mappings by editing the file
+- Organized by show (with season/series metadata, multi-to-1 supported):
+  ```json
+  {
+    "shows": {
+      "Show Name": {
+        "biliSeason": "ss73081",
+        "nicoSeries": 497560,
+        "eps": {
+          "ep1231523": { "sm": "so44461978", "bTitle": "EP1 ...", "nTitle": "..." }
+        }
+      }
+    },
+    "videos": {
+      "BV1xxxx": { "sm": "sm9", "bTitle": "...", "nTitle": "..." }
+    }
+  }
+  ```
+- Opening a video → lookup hit → auto-download the matching comments (requires the **Auto-map nico video IDs** toggle on); otherwise enter the sm ID manually
 
 ### Automatic memory
 
@@ -49,8 +72,9 @@ Settings (offset, font size, opacity) are stored in `chrome.storage.local` and r
 
 ## Architecture
 
-- `content.js` — player detection, overlay mounting, file loading, rAF sync loop, offset/font/opacity, SPA remount (MutationObserver); panel only created on video pages (/video/, /bangumi/play/, /list/)
+- `content.js` — player detection, overlay mounting, file loading, rAF sync loop, offset/font/opacity, mapping lookup/auto-download, SPA remount (MutationObserver); panel only created on video pages (/video/, /bangumi/play/, /list/)
 - `content.css` — panel UI
+- `background.js` — MV3 service worker: proxies niconico API requests (content scripts are CORS-bound, host_permissions enable anonymous/logged-in fetch) and mapping-table fetches (raw.githubusercontent + jsDelivr fallback)
 - `lib/bundle.js` — [niconicomments](https://github.com/xpadev-net/niconicomments) v0.3.1 bundle (includes CSSRenderer)
 - `lib/input.js` — XML/JSON parsing (same as iina-plugin-danmaku-cosmos)
 - `test-data/sample-nico.json` — 68-comment test data (v1 format)
@@ -86,4 +110,4 @@ Automation hook in the harness console: `window.postMessage({type:'nico-dm:load'
 - CA comments' `@jump` is ignored (no multi-video switching semantics in a browser context)
 - Native Bilibili comments are not touched — use the player's own danmaku toggle
 - File-handle mode (File System Access API) is Chrome-only; Firefox/Safari automatically use the "store file content" fallback
-- Anonymous niconico curated download: only public comments are available without login; paid/login-only content cannot be downloaded (load such files locally instead)
+- niconico comment download: uses the browser login session (`user_session`) automatically when logged in; anonymous users get public (curated) comments only

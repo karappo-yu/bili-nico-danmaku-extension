@@ -26,8 +26,8 @@
 4. B 站源与 nico 原视频时间轴不一致时,拖「偏移」滑块对齐(正=弹幕提前,负=延后)
 5. 字号/透明度即时生效;B 站原生弹幕用播放器自带的弹幕开关控制
 6. 「显示弹幕」开关:临时隐藏/显示 N 站弹幕(保留视频与文件的关联,与「清除弹幕」不同)
-7. **niconico 精选弹幕**:输入 sm 号或视频 URL(如 `sm9` / `https://www.nicovideo.jp/watch/sm9`)→「下载精选弹幕」自动获取该视频的精选弹幕并**缓存到本地**,下次直接读缓存;「刷新缓存」强制重新下载。**若浏览器已登录 niconico,自动使用登录态**(读取 `user_session`),可下载登录/付费限定的弹幕;未登录则匿名拉取公开弹幕
-8. **自动映射**:打开有映射的视频时,自动下载对应 nico 弹幕(映射表为人工维护的远程共享表,面板显示 B 站↔N 站标题对供核对)。「自动映射」开关可关
+7. **niconico 精选弹幕**:输入 sm 号或视频 URL(如 `sm9` / `https://www.nicovideo.jp/watch/sm9`)→ 自动获取该视频的精选弹幕并**缓存到本地**。按钮按状态显示:新号 →「下载精选弹幕」;已下载过 →「重新下载」(强制刷新缓存)。**若浏览器已登录 niconico,自动使用登录态**(读取 `user_session`),可下载登录/付费限定的弹幕;未登录则匿名拉取公开弹幕
+8. **自动映射n站视频号**(默认关):打开有映射的视频时,自动查映射表并下载对应 nico 弹幕,面板显示 N 站标题供核对。映射数据目前较少,需要时手动开启
 
 ### 映射表
 
@@ -49,7 +49,7 @@
     }
   }
   ```
-- 打开视频 → 查表命中 → 自动下载对应弹幕;没有则手动输入 sm 号
+- 打开视频 → 查表命中 → 自动下载对应弹幕(需开启「自动映射n站视频号」开关);没有则手动输入 sm 号
 
 ### 自动记忆
 
@@ -73,9 +73,9 @@
 
 ## 架构
 
-- `content.js` — 播放器解析、overlay 挂载、文件载入、rAF 同步循环、偏移/字号/透明度、SPA 重挂载(MutationObserver);仅在视频页(/video/、/bangumi/play/、/list/)创建面板
+- `content.js` — 播放器解析、overlay 挂载、文件载入、rAF 同步循环、偏移/字号/透明度、映射表查询/自动下载、SPA 重挂载(MutationObserver);仅在视频页(/video/、/bangumi/play/、/list/)创建面板
 - `content.css` — 面板 UI
-- `background.js` — MV3 service worker:代理 niconico API 请求(content script 受页面 CORS 限制,凭 host_permissions 匿名拉取公开弹幕)
+- `background.js` — MV3 service worker:代理 niconico API 请求(content script 受页面 CORS 限制,凭 host_permissions 匿名/带登录态拉取公开弹幕)与映射表拉取(raw.githubusercontent + jsDelivr 备用)
 - `lib/bundle.js` — [niconicomments](https://github.com/xpadev-net/niconicomments) v0.3.1 bundle(含 CSSRenderer)
 - `lib/input.js` — XML/JSON 解析(同 iina-plugin-danmaku-cosmos)
 - `test-data/sample-nico.json` — 68 条 v1 格式测试弹幕
