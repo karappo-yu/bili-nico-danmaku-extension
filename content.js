@@ -256,6 +256,7 @@
   function applyDmVisible() {
     if (host) host.style.display = settings.dmVisible ? '' : 'none';
     if (settings.dmVisible) {
+      if (video) resyncDmTime(); // 兜底: 关闭期间时间轴可能漂移, 打开时重新锚定
       lastVpos = -1;
       if (engine && video) engine.drawCanvas(vposOf(), true);
     }
@@ -264,11 +265,11 @@
   function loop(now) {
     rafId = requestAnimationFrame(loop);
     if (!engine || !video || !data) return;
-    if (!settings.dmVisible) { lastFrameTime = null; return; } // 弹幕显示关闭: 不渲染
     if (lastFrameTime === null) { lastFrameTime = now; return; }
     const dt = (now - lastFrameTime) / 1000;
     lastFrameTime = now;
     if (!video.paused && !stalled) dmTime += dt * (video.playbackRate || 1);
+    if (!settings.dmVisible) return; // 弹幕显示关闭: 时钟照走, 只不渲染 (打开时不错位)
     const vpos = vposOf();
     const isSeek = Math.abs(vpos - lastVpos) > 150;
     if (video.paused) {
