@@ -24,6 +24,7 @@
     offset: 0,       // 秒
     scale: 1.0,
     opacity: 0.85,
+    dmVisible: true, // 显示 N 站弹幕 (关 = 临时隐藏, 不影响关联)
     panelX: null,
     panelY: null,
   };
@@ -217,6 +218,7 @@
 
     lastVpos = -1;
     if (video) engine.drawCanvas(vposOf(), true);
+    applyDmVisible(); // 按开关状态显示/隐藏 overlay (关 = 载入但暂不显示)
     setStatus('已载入 ' + countComments(data) + ' 条', true);
   }
 
@@ -250,9 +252,19 @@
     lastVpos = -1;        // 触发重绘
   }
 
+  // 显示开关: 关 = 临时隐藏 overlay (关联保留), 开 = 立即恢复渲染
+  function applyDmVisible() {
+    if (host) host.style.display = settings.dmVisible ? '' : 'none';
+    if (settings.dmVisible) {
+      lastVpos = -1;
+      if (engine && video) engine.drawCanvas(vposOf(), true);
+    }
+  }
+
   function loop(now) {
     rafId = requestAnimationFrame(loop);
     if (!engine || !video || !data) return;
+    if (!settings.dmVisible) { lastFrameTime = null; return; } // 弹幕显示关闭: 不渲染
     if (lastFrameTime === null) { lastFrameTime = now; return; }
     const dt = (now - lastFrameTime) / 1000;
     lastFrameTime = now;
@@ -571,7 +583,7 @@
 
   // ---------- UI ----------
   let panel, fileInput, fileNameEl, statusEl;
-  let offsetEl, offsetValEl, scaleEl, scaleValEl, opacityEl, opacityValEl;
+  let offsetEl, offsetValEl, scaleEl, scaleValEl, opacityEl, opacityValEl, visibleEl;
 
   function buildPanel() {
     if (panel) return;
@@ -602,6 +614,10 @@
           <label class="ndp-label">透明度</label>
           <input type="range" id="ndp-opacity" min="10" max="100" step="5" value="85">
           <span class="ndp-val" id="ndp-opacity-val">0.85</span>
+        </div>
+        <div class="ndp-row">
+          <label class="ndp-label">显示弹幕</label>
+          <input type="checkbox" id="ndp-visible" checked>
         </div>
         <div class="ndp-actions">
           <button class="ndp-btn" id="ndp-clear">清除弹幕</button>
@@ -653,6 +669,13 @@
       saveSettings();
     });
     $('#ndp-clear').addEventListener('click', clearDanmakuAndRecord);
+    visibleEl = $('#ndp-visible');
+    visibleEl.checked = settings.dmVisible;
+    visibleEl.addEventListener('change', () => {
+      settings.dmVisible = visibleEl.checked;
+      applyDmVisible();
+      saveSettings();
+    });
     panel.querySelector('.ndp-collapse').addEventListener('click', () => {
       panel.classList.toggle('ndp-collapsed');
     });

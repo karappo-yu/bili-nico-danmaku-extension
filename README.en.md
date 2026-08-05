@@ -24,6 +24,7 @@ Pick a nico danmaku JSON/XML file → the comments are overlaid on the Bilibili 
 2. Play the video — comments sync smoothly (rAF dt accumulation clock, uniform 60 fps steps, independent of video frame rate)
 3. If the Bilibili source and the original nico video timelines differ, drag the **Offset** slider to align (positive = comments earlier, negative = later)
 4. Font size / opacity apply immediately; native Bilibili comments are controlled by the player's own danmaku toggle
+5. **Show danmaku** toggle: temporarily hide/show nico comments (keeps the video↔file association; unlike **Clear danmaku**)
 
 ### Automatic memory
 
