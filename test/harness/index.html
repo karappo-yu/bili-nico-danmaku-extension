@@ -56,6 +56,11 @@
                 } },
                 video: { title: 'モック動画' },
               } } } });
+            } else if (msg.url.includes('raw.githubusercontent.com')) {
+              // 远程映射表 mock
+              cb({ ok: true, data: {
+                'BV1TEST12345': { sm: 'sm9', bTitle: '【测试】示例视频', nTitle: 'テスト用動画' }
+              } });
             } else if (msg.url.includes('/v1/threads')) {
               const fork = JSON.parse(msg.opts.body).params.targets[0].fork;
               const comments = [1, 2].map((i) => ({

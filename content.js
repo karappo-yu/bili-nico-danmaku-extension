@@ -25,12 +25,17 @@
     scale: 1.0,
     opacity: 0.85,
     dmVisible: true, // 显示 N 站弹幕 (关 = 临时隐藏, 不影响关联)
+    autoMap: true,   // 自动下载 bvid↔sm 映射表中该视频对应的 nico 弹幕
     panelX: null,
     panelY: null,
   };
   const STORAGE_KEY = 'nicoDmSettings';
   const DANMAKU_KEY = 'nicoDmFiles'; // 弹幕文件记录: { [videoId]: { name, text?, offset, ts, source } }
   const NICOCACHE_KEY = 'nicoDmNicoCache'; // niconico 精选弹幕缓存: { [smId]: { title, text, ts } }
+  const MAPPING_KEY = 'nicoDmMapping'; // 本地 bvid↔sm 映射: { [bvid]: { sm, bTitle, nTitle, ts } }
+  const REMOTE_MAP_CACHE_KEY = 'nicoDmRemoteMap'; // 远程映射表缓存: { data, ts }
+  const REMOTE_MAP_URL = 'https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json';
+  const REMOTE_MAP_TTL = 24 * 3600 * 1000; // 远程表缓存 24h
   // source: 'handle' = 本地文件句柄 (IDB, 直接读盘, 不占 storage); 'content' = 文件内容 (storage, fallback)
 
   // ---------- IndexedDB: 本地文件句柄持久化 ----------
@@ -387,9 +392,17 @@
     const path = (i === -1 ? String(k) : k.slice(0, i)).replace(/\/+$/, '');
     return path + (i === -1 ? '' : k.slice(i));
   }
-  // 宽松归一: 尾斜杠 + 去掉 bvid 参数段 (普通视频页 pathname 已含 BV)
+  // 宽松归一: 尾斜杠 + 仅当 pathname 含视频标识 (BV/ep) 时剥离 bvid 参数段
+  // (旧数据在 /video/BV1xx/ 页面带冗余 bvid 段 /video/BV1xx|bvidBV1xx|p2);
+  // pathname 无 BV 的页面 (测试台/合集), bvid 参数是必要区分, 不能剥!
   function looseNorm(k) {
-    return normVidKey(k).replace(/\|bv[^|]*/i, '');
+    const s = normVidKey(k);
+    const i = s.indexOf('|');
+    const path = i === -1 ? s : s.slice(0, i);
+    if (/\/(BV|ep)/i.test(path)) {
+      return s.replace(/\|bv[^|]*/i, '');
+    }
+    return s;
   }
   function lookupRecord(all, vid) {
     if (!all) return null;
@@ -490,6 +503,9 @@
     const text = JSON.stringify(threads);
     await loadFile(new File([text], smId + '.curated.json', { type: 'application/json' }));
     const total = countThreadComments(threads);
+    // 记录本地映射: bvid → sm + 双标题 (供自动映射命中/贡献)
+    const bvid = getBvid();
+    if (bvid) saveLocalMapping(bvid, smId, title);
     const info = document.getElementById('ndp-sm-info');
     if (info) {
       info.textContent = (fromCache ? '缓存' : '已下载') + ' · ' + title + ' · 精选 ' + total + ' 条';
@@ -497,7 +513,8 @@
     }
   }
 
-  async function downloadNico(smId, force) {
+  // quiet=true: 失败灰色提示 (映射自动下载不打扰), 否则红字
+  async function downloadNico(smId, force, quiet) {
     const info = document.getElementById('ndp-sm-info');
     const setInfo = (msg, cls) => { if (info) { info.textContent = msg; info.className = 'ndp-nico-info' + (cls ? ' ' + cls : ''); } };
     if (!smId) { setInfo('请输入 sm 号或视频 URL', 'ndp-err'); return; }
@@ -517,7 +534,86 @@
       writeNicoCache(smId, { title, text: JSON.stringify(threads), ts: Date.now() });
       await loadNicoComments(smId, title, threads, false);
     } catch (e) {
-      setInfo('失败: ' + (e && e.message || e), 'ndp-err');
+      setInfo('失败: ' + (e && e.message || e), quiet ? '' : 'ndp-err');
+    }
+  }
+
+  // ---------- bvid ↔ sm 映射表 ----------
+  function getBvid() {
+    const p = location.pathname.match(/\/(BV[0-9A-Za-z]{10})\/?/);
+    if (p) return p[1];
+    const q = location.search.match(/[?&]bvid=(BV[0-9A-Za-z]{10})/);
+    return q ? q[1] : null;
+  }
+  function getBiliTitle() {
+    const el = document.querySelector('.video-info-title, .video-title, h1');
+    return el ? el.textContent.trim() : '';
+  }
+
+  // 本地映射: 下载 nico 弹幕时自动记录 (bvid → sm + 双标题)
+  function saveLocalMapping(bvid, sm, nTitle) {
+    if (!bvid || !sm) return;
+    try {
+      chrome.storage.local.get(MAPPING_KEY, (res) => {
+        const all = (res && res[MAPPING_KEY]) || {};
+        const prev = all[bvid];
+        all[bvid] = { sm, bTitle: (prev && prev.bTitle) || getBiliTitle(), nTitle: nTitle || '', ts: Date.now() };
+        chrome.storage.local.set({ [MAPPING_KEY]: all });
+      });
+    } catch (e) {}
+  }
+  function getLocalMapping(bvid) {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(MAPPING_KEY, (res) => {
+          const all = (res && res[MAPPING_KEY]) || {};
+          resolve(all[bvid] || null);
+        });
+      } catch (e) { resolve(null); }
+    });
+  }
+
+  // 远程映射表 (GitHub mappings.json), 24h 缓存, 失败静默
+  async function refreshRemoteMap(force) {
+    try {
+      if (!force) {
+        const cache = await new Promise((res) => {
+          chrome.storage.local.get(REMOTE_MAP_CACHE_KEY, (r) => res((r && r[REMOTE_MAP_CACHE_KEY]) || null));
+        });
+        if (cache && cache.data && Date.now() - (cache.ts || 0) < REMOTE_MAP_TTL) return cache.data;
+      }
+      const data = await fetchViaBg(REMOTE_MAP_URL);
+      if (!data || typeof data !== 'object') return null;
+      chrome.storage.local.set({ [REMOTE_MAP_CACHE_KEY]: { data, ts: Date.now() } });
+      return data;
+    } catch (e) { return null; }
+  }
+  async function getRemoteMapping(bvid) {
+    const table = await refreshRemoteMap(false);
+    return (table && table[bvid]) || null;
+  }
+
+  // 查表: 本地映射优先 (用户自己下载过的更可信), 远程兜底
+  async function lookupMapping(bvid) {
+    if (!bvid) return null;
+    const local = await getLocalMapping(bvid);
+    if (local) return { ...local, source: 'local' };
+    const remote = await getRemoteMapping(bvid);
+    if (remote) return { ...remote, source: 'remote' };
+    return null;
+  }
+
+  // 映射命中 → 自动下载 (静默失败), 成功后显示标题对供用户核对
+  async function autoDownloadFromMapping(m, targetVid) {
+    if (targetVid && currentVideoId() !== targetVid) return; // 已切走
+    try {
+      await downloadNico(m.sm, false, true); // quiet: 失败不弹红字
+    } catch (e) { return; }
+    if (targetVid && currentVideoId() !== targetVid) return;
+    const info = document.getElementById('ndp-sm-info');
+    if (info) {
+      info.textContent = '自动映射' + (m.source === 'local' ? '(本地)' : '') + ': 《' + (m.bTitle || '?') + '》 ↔ 《' + (m.nTitle || m.sm) + '》';
+      info.className = 'ndp-nico-info ndp-ok';
     }
   }
 
@@ -610,12 +706,25 @@
           const rec = lookupRecord(res && res[DANMAKU_KEY], vid);
           if (!rec || !rec.text) {
             settle();
-            // 延迟确认: B 站切 P 时 URL 可能还在渐进变化 (临时参数), 先别报未找到;
-            // 期间已加载 (data) 或已切到别处 (URL 变) 就不报
-            setTimeout(() => {
-              if (data || currentVideoId() !== vid) return;
-              setStatus('未找到该视频的关联弹幕, 请选择文件', 'err');
-            }, 2000);
+            const notifyNotFound = () => {
+              // 延迟确认: B 站切 P 时 URL 可能还在渐进变化 (临时参数), 先别报未找到;
+              // 期间已加载 (data) 或已切到别处 (URL 变) 就不报
+              setTimeout(() => {
+                if (data || currentVideoId() !== vid) return;
+                setStatus('未找到该视频的关联弹幕, 请选择文件', 'err');
+              }, 2000);
+            };
+            // 无本地关联 → 查 bvid↔sm 映射表 (开关开时自动下载)
+            if (!settings.autoMap) { notifyNotFound(); return; }
+            const bvid = getBvid();
+            if (!bvid) { notifyNotFound(); return; }
+            try {
+              lookupMapping(bvid).then((m) => {
+                if (!m) { notifyNotFound(); return; }
+                if (data || currentVideoId() !== vid) return; // 已加载/切走
+                autoDownloadFromMapping(m, vid);
+              }).catch(notifyNotFound);
+            } catch (e) { notifyNotFound(); }
             return;
           }
           settle();
@@ -651,13 +760,27 @@
       chrome.storage.local.get(DANMAKU_KEY, (res) => {
         const rec = lookupRecord(res && res[DANMAKU_KEY], newVid);
         if (!rec || !rec.text) {
-          // 新视频无关联 → 清旧弹幕, 延迟确认后提示
+          // 新视频无关联 → 清旧弹幕; 查 bvid↔sm 映射表 (开关开时自动下载)
           switching = false;
           clearDanmaku();
-          setTimeout(() => {
-            if (data || currentVideoId() !== newVid) return;
-            setStatus('未找到该视频的关联弹幕, 请选择文件', 'err');
-          }, 2000);
+          const notifyNotFound = () => {
+            setTimeout(() => {
+              if (data || currentVideoId() !== newVid) return;
+              setStatus('未找到该视频的关联弹幕, 请选择文件', 'err');
+            }, 2000);
+          };
+          if (settings.autoMap) {
+            const bvid = getBvid();
+            if (bvid) {
+              lookupMapping(bvid).then((m) => {
+                if (!m) { notifyNotFound(); return; }
+                if (data || currentVideoId() !== newVid) return;
+                autoDownloadFromMapping(m, newVid);
+              }).catch(notifyNotFound);
+              return;
+            }
+          }
+          notifyNotFound();
           return;
         }
         parseDanmakuText(rec.text).then((loaded) => {
@@ -753,6 +876,10 @@
           <label class="ndp-label">显示弹幕</label>
           <input type="checkbox" id="ndp-visible" checked>
         </div>
+        <div class="ndp-row">
+          <label class="ndp-label">自动映射</label>
+          <input type="checkbox" id="ndp-automap" checked title="打开有映射的视频时自动下载对应 nico 弹幕">
+        </div>
         <div class="ndp-actions">
           <button class="ndp-btn" id="ndp-clear">清除弹幕</button>
         </div>
@@ -808,6 +935,12 @@
     visibleEl.addEventListener('change', () => {
       settings.dmVisible = visibleEl.checked;
       applyDmVisible();
+      saveSettings();
+    });
+    const autoMapEl = $('#ndp-automap');
+    autoMapEl.checked = settings.autoMap;
+    autoMapEl.addEventListener('change', () => {
+      settings.autoMap = autoMapEl.checked;
       saveSettings();
     });
     const smInput = $('#ndp-sm');
