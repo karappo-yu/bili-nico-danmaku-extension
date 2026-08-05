@@ -591,10 +591,19 @@
   }
 
   // 查表: 远程共享表 (人工维护), 命中 → 自动下载
+  // 表结构: { shows: { 番名: { biliSeason, nicoSeries, eps: { key: {sm,bTitle,nTitle} } } }, videos: { key: {...} } }
   async function lookupMapping(mapKey) {
     if (!mapKey) return null;
     const table = await refreshRemoteMap(false);
-    return (table && table[mapKey]) || null;
+    if (!table) return null;
+    const shows = (table.shows && typeof table.shows === 'object') ? table.shows : {};
+    for (const name in shows) {
+      const eps = shows[name] && shows[name].eps;
+      if (eps && eps[mapKey]) return eps[mapKey];
+    }
+    const videos = (table.videos && typeof table.videos === 'object') ? table.videos : {};
+    if (videos[mapKey]) return videos[mapKey];
+    return null;
   }
 
   // 映射命中 → 自动下载 (静默失败), 成功后显示标题对供用户核对

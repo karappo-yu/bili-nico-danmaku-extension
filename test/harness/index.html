@@ -49,11 +49,21 @@
             }
             window.__fetchLog.push({ url: msg.url, hasCookie: !!(opts.headers && opts.headers.Cookie) });
             if (msg.url.includes('__ndp_builtin__')) {
-              // 扩展内置表 mock: 与 mappings.json 同步 (14 条全集)
+              // 扩展内置表 mock: 与 mappings.json 同步 (新结构: shows/videos)
               cb({ ok: true, data: {
-                'ss73081': { sm: 'so44461978', bTitle: '颂乐人偶 (BanG Dream! Ave Mujica)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
-                'ep1231523': { sm: 'so44461978', bTitle: '第1话 秘密。(Sub rosa.)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
-                'ep1449272': { sm: 'so44809405', bTitle: '第13话 循此苦旅,终抵繁星。(Per aspera ad astra)', nTitle: 'BanG Dream! Ave Mujica #13「Per aspera ad astra.」' }
+                shows: {
+                  '颂乐人偶 (BanG Dream! Ave Mujica)': {
+                    biliSeason: 'ss73081', nicoSeries: 497560,
+                    eps: {
+                      'ss73081': { sm: 'so44461978', bTitle: '合集首页', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
+                      'ep1231523': { sm: 'so44461978', bTitle: '第1话 秘密。(Sub rosa.)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
+                      'ep1449272': { sm: 'so44809405', bTitle: '第13话 循此苦旅,终抵繁星。', nTitle: 'BanG Dream! Ave Mujica #13「Per aspera ad astra.」' }
+                    }
+                  }
+                },
+                videos: {
+                  'BV1TEST12345': { sm: 'sm9', bTitle: '【测试】示例视频', nTitle: 'テスト用動画' }
+                }
               } });
             } else if (msg.url.includes('/watch/')) {
               cb({ ok: true, data: { data: { response: {
@@ -65,12 +75,18 @@
                 video: { title: 'モック動画' },
               } } } });
             } else if (msg.url.includes('raw.githubusercontent.com')) {
-              // 远程映射表 mock (与 mappings.json 同步)
+              // 远程映射表 mock (新结构, 模拟 GitHub 增量更新)
               cb({ ok: true, data: {
-                'BV1TEST12345': { sm: 'sm9', bTitle: '【测试】示例视频', nTitle: 'テスト用動画' },
-                'ss73081': { sm: 'so44461978', bTitle: '颂乐人偶', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
-                'ep1231523': { sm: 'so44461978', bTitle: '第1话 秘密。(Sub rosa.)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
-                'ep1449272': { sm: 'so44809405', bTitle: '第13话 循此苦旅,终抵繁星。', nTitle: 'BanG Dream! Ave Mujica #13「Per aspera ad astra.」' }
+                shows: {
+                  '颂乐人偶 (BanG Dream! Ave Mujica)': {
+                    biliSeason: 'ss73081', nicoSeries: 497560,
+                    eps: {
+                      'ss73081': { sm: 'so44461978', bTitle: '合集首页', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
+                      'ep1231523': { sm: 'so44461978', bTitle: '第1话 秘密。(Sub rosa.)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' }
+                    }
+                  }
+                },
+                videos: {}
               } });
             } else if (msg.url.includes('/v1/threads')) {
               const fork = JSON.parse(msg.opts.body).params.targets[0].fork;
