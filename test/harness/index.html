@@ -49,8 +49,12 @@
             }
             window.__fetchLog.push({ url: msg.url, hasCookie: !!(opts.headers && opts.headers.Cookie) });
             if (msg.url.includes('__ndp_builtin__')) {
-              // 扩展内置表 mock: 空 (测试走远程更新路径)
-              cb({ ok: true, data: {} });
+              // 扩展内置表 mock: 与 mappings.json 同步 (14 条全集)
+              cb({ ok: true, data: {
+                'ss73081': { sm: 'so44461978', bTitle: '颂乐人偶 (BanG Dream! Ave Mujica)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
+                'ep1231523': { sm: 'so44461978', bTitle: '第1话 秘密。(Sub rosa.)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
+                'ep1449272': { sm: 'so44809405', bTitle: '第13话 循此苦旅,终抵繁星。(Per aspera ad astra)', nTitle: 'BanG Dream! Ave Mujica #13「Per aspera ad astra.」' }
+              } });
             } else if (msg.url.includes('/watch/')) {
               cb({ ok: true, data: { data: { response: {
                 comment: { nvComment: {
