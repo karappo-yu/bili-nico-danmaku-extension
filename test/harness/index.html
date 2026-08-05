@@ -66,6 +66,14 @@
                       'BV1xMrFBGEF2|p1': { sm: 'so37658638', bTitle: '第1集', nTitle: '安達としまむら 第1話「制服ピンポン」' },
                       'BV1xMrFBGEF2|p12': { sm: 'so37999620', bTitle: '第12集', nTitle: '安達としまむら 第12話「友と愛と 愛と桜と」' }
                     }
+                  },
+                  // ss 首页测试番: 只有 ep 键, 无 ss 键 — 验证 ss 页解析选集高亮得 ep 号
+                  '测试番剧 (ss 首页解析)': {
+                    biliSeason: 'ss99999', nicoSeries: 999999,
+                    eps: {
+                      'ep5550001': { sm: 'sm10', bTitle: '第1话 测试', nTitle: 'テスト第1話' },
+                      'ep5550002': { sm: 'sm11', bTitle: '第2话 测试', nTitle: 'テスト第2話' }
+                    }
                   }
                 },
                 videos: {
@@ -182,6 +190,15 @@
         <span class="time" id="time">00:00 / 01:30</span>
       </div>
     </div>
+    <!-- 伪选集: 模拟番剧页选集列表 (ss 首页 URL 保持 ss, 高亮当前播放集, 项内含 /bangumi/play/ep 链接) -->
+    <div class="fake-ep-list" id="fakeEpList" style="margin-top:12px">
+      <div class="numberListItem_number_list_item__T2VKO" data-ep-id="5550001">
+        <a href="/bangumi/play/ep5550001">第1话 测试</a>
+      </div>
+      <div class="numberListItem_number_list_item__T2VKO" data-ep-id="5550002">
+        <a href="/bangumi/play/ep5550002">第2话 测试</a>
+      </div>
+    </div>
     <p style="margin-top:12px;color:#666;font-size:12px">
       测试步骤: ① 点右上角「选择弹幕文件」加载 <code>extension/test-data/sample-nico.json</code>
       (自动化: 控制台 <code>window.postMessage({type:'nico-dm:load', name:'sample.json', text:JSON.stringify(SAMPLE)}, '*')</code>)
@@ -204,6 +221,35 @@
     progress.oninput = () => video.currentTime = progress.value / 100 * video.duration;
     video.addEventListener('play', () => playPause.textContent = '⏸ 暂停');
     video.addEventListener('pause', () => playPause.textContent = '▶ 播放');
+    // 伪选集: 按当前 URL (ep/ss) 设置高亮项; 点击项 → history.replaceState 模拟切集 (不 reload)
+    function syncFakeEp() {
+      const list = document.getElementById('fakeEpList');
+      if (!list) return;
+      const m = location.pathname.match(/\/bangumi\/play\/ep(\d+)/);
+      let activeId = null;
+      if (m) {
+        activeId = m[1];
+      } else {
+        // ss 首页: 默认高亮第 1 集 (模拟"ss 页实际在播第一集")
+        const first = list.querySelector('[data-ep-id]');
+        activeId = first && first.getAttribute('data-ep-id');
+      }
+      list.querySelectorAll('[data-ep-id]').forEach((el) => {
+        if (el.getAttribute('data-ep-id') === activeId) {
+          el.classList.add('numberListItem_select__WgCVr');
+        } else {
+          el.classList.remove('numberListItem_select__WgCVr');
+        }
+      });
+    }
+    syncFakeEp();
+    document.getElementById('fakeEpList').addEventListener('click', (e) => {
+      const a = e.target.closest('a[href*="/bangumi/play/ep"]');
+      if (!a) return;
+      e.preventDefault();
+      history.replaceState(null, '', a.getAttribute('href'));
+      syncFakeEp();
+    });
     // 预载示例数据供自动化用
     window.SAMPLE = null;
     fetch('/test-data/sample-nico.json').then(r => r.json()).then(d => window.SAMPLE = d);

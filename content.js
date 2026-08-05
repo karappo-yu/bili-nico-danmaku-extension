@@ -551,13 +551,45 @@
   }
 
   // ---------- 映射表 (远程共享, 人工维护) ----------
+  // ss 合集首页 (URL 保持 ss 不跳转) 实际在播具体一集:
+  // 从选集列表高亮项解析当前 ep 号 (新版 React UI: numberListItem_select; 旧版 bpx: ep-item.active)
+  function currentEpFromDom() {
+    // 1) 高亮选集项内的 ep 链接 (href 形如 /bangumi/play/ep123/ )
+    const linkSel = [
+      '[class*="numberListItem_select"] a[href*="/bangumi/play/ep"]',
+      '.bpx-player-ep-item.active a[href*="/bangumi/play/ep"]',
+      '.ep-item.active a[href*="/bangumi/play/ep"]',
+      '.ep-item.on a[href*="/bangumi/play/ep"]',
+    ].join(', ');
+    const a = document.querySelector(linkSel);
+    if (a) {
+      const m = (a.getAttribute('href') || '').match(/\/bangumi\/play\/ep(\d+)/);
+      if (m) return m[1];
+    }
+    // 2) 高亮项上的 data-ep-id 属性
+    const active = document.querySelector(
+      '[class*="numberListItem_select"], .bpx-player-ep-item.active, .ep-item.active, .ep-item.on'
+    );
+    if (active) {
+      const id = active.getAttribute('data-ep-id') || active.getAttribute('data-ep');
+      if (/^\d+$/.test(id || '')) return id;
+    }
+    return null;
+  }
+
   // 当前 B 站视频的映射 key: 番剧 ep/ss 号 / 普通视频 BV(+分P) / query bvid
   function getMappingKey() {
     const path = location.pathname;
     const ep = path.match(/\/bangumi\/play\/ep(\d+)/);
     if (ep) return 'ep' + ep[1];
     const ss = path.match(/\/bangumi\/play\/ss(\d+)/); // 番剧合集首页 (URL 保持 ss 不跳转)
-    if (ss) return 'ss' + ss[1];
+    if (ss) {
+      // ss 页实际在播具体一集: 优先解析选集高亮项得 ep 号 (映射表 eps 键 = ep{号});
+      // 解析不到时回退 ss{号} (表里可能有合集首页条目)
+      const cur = currentEpFromDom();
+      if (cur) return 'ep' + cur;
+      return 'ss' + ss[1];
+    }
     const p = location.search.match(/[?&]p=(\d+)/);
     const bv = path.match(/\/(BV[0-9A-Za-z]{10})\/?/);
     if (bv) return bv[1] + (p ? '|p' + p[1] : '');
