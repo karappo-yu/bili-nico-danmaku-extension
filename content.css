@@ -51,7 +51,7 @@
   margin-bottom: 8px;
 }
 #nico-dm-panel .ndp-row:last-child { margin-bottom: 0; }
-#nico-dm-panel .ndp-row-split { justify-content: space-between; }
+#nico-dm-panel .ndp-row-split { justify-content: flex-start; }
 #nico-dm-panel .ndp-toggle-item {
   display: flex;
   align-items: center;
