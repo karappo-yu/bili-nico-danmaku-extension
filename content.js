@@ -341,6 +341,7 @@
     if (!smInput) return;
     const smM = String(name || '').match(/^(sm\d+|so\d+|nm\d+)\.curated\.json$/i);
     smInput.value = smM ? smM[1].toLowerCase() : '';
+    updateFetchBtn(); // 输入框变化 → 按钮「下载/重新下载」同步
   }
 
   async function loadFile(file, handle) {
@@ -620,6 +621,28 @@
     }
   }
 
+  // 缓存中是否已有该 sm 号 (决定按钮显示「下载」还是「重新下载」)
+  function nicoCacheHas(smId) {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(NICOCACHE_KEY, (res) => {
+          const all = (res && res[NICOCACHE_KEY]) || {};
+          resolve(!!(all[smId] && all[smId].text));
+        });
+      } catch (e) { resolve(false); }
+    });
+  }
+
+  // 下载/刷新合并为一个动态按钮: 已下载过 → 「重新下载」, 新的 → 「下载精选弹幕」
+  async function updateFetchBtn() {
+    const input = document.getElementById('ndp-sm');
+    const btn = document.getElementById('ndp-sm-fetch');
+    if (!input || !btn) return;
+    const smId = parseSmInput(input.value);
+    if (!smId) { btn.textContent = '下载精选弹幕'; return; }
+    btn.textContent = (await nicoCacheHas(smId)) ? '重新下载' : '下载精选弹幕';
+  }
+
   // ---------- 弹幕文件关联记忆 ----------
   // 选择文件时记住视频号 + 偏移; 刷新后自动加载
   // handle 模式: 本地文件句柄存 IDB (直接读盘, 不占 storage); content 模式: 文件内容存 storage (fallback)
@@ -856,7 +879,6 @@
           <input id="ndp-sm" placeholder="niconico: sm9 或完整 URL" spellcheck="false">
           <div class="ndp-nico-btns">
             <button class="ndp-btn" id="ndp-sm-fetch">下载精选弹幕</button>
-            <button class="ndp-btn" id="ndp-sm-refresh" title="忽略缓存, 重新从 niconico 下载">刷新缓存</button>
           </div>
           <div class="ndp-nico-info" id="ndp-sm-info"></div>
         </div>
@@ -950,21 +972,28 @@
     });
     const smInput = $('#ndp-sm');
     const smFetchBtn = $('#ndp-sm-fetch');
-    const smRefreshBtn = $('#ndp-sm-refresh');
     let nicoBusy = false;
-    const runNico = (force) => {
+    const smInfo = () => document.getElementById('ndp-sm-info');
+    smFetchBtn.addEventListener('click', () => {
       if (nicoBusy) return;
       const smId = parseSmInput(smInput.value);
+      if (!smId) {
+        const info = smInfo();
+        if (info) { info.textContent = '请输入 sm 号或 niconico 视频 URL'; info.className = 'ndp-nico-info ndp-err'; }
+        return;
+      }
       nicoBusy = true;
-      smFetchBtn.disabled = smRefreshBtn.disabled = true;
-      downloadNico(smId, force).finally(() => {
+      smFetchBtn.disabled = true;
+      // 已下载过 → 强制重新下载 (刷新缓存); 新号 → 正常下载 (缓存命中直接用)
+      nicoCacheHas(smId).then((has) => downloadNico(smId, has)).finally(() => {
         nicoBusy = false;
-        smFetchBtn.disabled = smRefreshBtn.disabled = false;
+        smFetchBtn.disabled = false;
+        updateFetchBtn();
       });
-    };
-    smFetchBtn.addEventListener('click', () => runNico(false));
-    smRefreshBtn.addEventListener('click', () => runNico(true));
-    smInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runNico(false); });
+    });
+    smInput.addEventListener('input', updateFetchBtn);
+    smInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') smFetchBtn.click(); });
+    updateFetchBtn();
     panel.querySelector('.ndp-collapse').addEventListener('click', () => {
       panel.classList.toggle('ndp-collapsed');
     });
