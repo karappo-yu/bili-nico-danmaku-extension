@@ -929,7 +929,7 @@
             <input type="checkbox" id="ndp-visible" checked>
           </span>
           <span class="ndp-toggle-item">
-            <label class="ndp-label">自动映射(数据较少)</label>
+            <label class="ndp-label">自动映射n站视频号(数据较少)</label>
             <input type="checkbox" id="ndp-automap" title="打开有映射的视频时自动下载对应 nico 弹幕">
           </span>
         </div>
