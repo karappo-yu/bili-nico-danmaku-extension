@@ -623,6 +623,55 @@
     }
   }
 
+  // 面板「映射表」查看 + 导出 (供提交共享表)
+  function escHtml(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function renderMappingList() {
+    const list = document.getElementById('ndp-map-list');
+    if (!list) return;
+    chrome.storage.local.get(MAPPING_KEY, (res) => {
+      const all = (res && res[MAPPING_KEY]) || {};
+      const keys = Object.keys(all).sort();
+      const toggle = document.getElementById('ndp-map-toggle');
+      if (toggle) toggle.textContent = '📋 映射表 (' + keys.length + ')';
+      if (keys.length === 0) { list.innerHTML = '<div class="ndp-map-empty">暂无本地映射 — 下载过 nico 弹幕的视频会自动记录</div>'; return; }
+      list.innerHTML = keys.map((k) => {
+        const m = all[k];
+        const t = new Date(m.ts).toLocaleDateString();
+        return '<div class="ndp-map-item">' +
+          '<span class="ndp-map-key">' + escHtml(k) + '</span> → <span class="ndp-map-sm">' + escHtml(m.sm) + '</span>' +
+          '<div class="ndp-map-titles">《' + escHtml(m.bTitle || '?') + '》 ↔ 《' + escHtml(m.nTitle || '?') + '》</div>' +
+          '<div class="ndp-map-ts">' + t + '</div></div>';
+      }).join('');
+    });
+  }
+  function exportMappingJson() {
+    chrome.storage.local.get(MAPPING_KEY, (res) => {
+      const all = (res && res[MAPPING_KEY]) || {};
+      const lines = Object.keys(all).sort().map((k) => {
+        const m = all[k];
+        return '  "' + k + '": { "sm": "' + m.sm + '", "bTitle": "' + (m.bTitle || '') + '", "nTitle": "' + (m.nTitle || '') + '" }';
+      });
+      const json = '{\n' + lines.join(',\n') + '\n}\n';
+      const done = () => {
+        const info = document.getElementById('ndp-sm-info');
+        if (info) { info.textContent = '已复制 ' + Object.keys(all).length + ' 条映射 (可提交到 mappings.json)'; info.className = 'ndp-nico-info ndp-ok'; }
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(json).then(done).catch(() => done());
+      } else {
+        const ta = document.createElement('textarea');
+        ta.value = json;
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        ta.remove();
+        done();
+      }
+    });
+  }
+
   // ---------- 弹幕文件关联记忆 ----------
   // 选择文件时记住视频号 + 偏移; 刷新后自动加载
   // handle 模式: 本地文件句柄存 IDB (直接读盘, 不占 storage); content 模式: 文件内容存 storage (fallback)
@@ -889,6 +938,13 @@
         <div class="ndp-actions">
           <button class="ndp-btn" id="ndp-clear">清除弹幕</button>
         </div>
+        <div class="ndp-map">
+          <button class="ndp-btn ndp-map-toggle" id="ndp-map-toggle">📋 映射表</button>
+          <div class="ndp-map-body" id="ndp-map-body" style="display:none">
+            <div class="ndp-map-list" id="ndp-map-list"></div>
+            <button class="ndp-btn" id="ndp-map-export">复制 JSON (提交共享表)</button>
+          </div>
+        </div>
         <div class="ndp-status" id="ndp-status"></div>
       </div>
     `;
@@ -936,6 +992,14 @@
       saveSettings();
     });
     $('#ndp-clear').addEventListener('click', clearDanmakuAndRecord);
+    const mapToggle = $('#ndp-map-toggle');
+    const mapBody = $('#ndp-map-body');
+    mapToggle.addEventListener('click', () => {
+      const show = mapBody.style.display === 'none';
+      mapBody.style.display = show ? '' : 'none';
+      if (show) renderMappingList();
+    });
+    $('#ndp-map-export').addEventListener('click', exportMappingJson);
     visibleEl = $('#ndp-visible');
     visibleEl.checked = settings.dmVisible;
     visibleEl.addEventListener('change', () => {
