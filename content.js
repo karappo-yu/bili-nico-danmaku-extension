@@ -25,7 +25,7 @@
     scale: 1.0,
     opacity: 0.85,
     dmVisible: true, // 显示 N 站弹幕 (关 = 临时隐藏, 不影响关联)
-    autoMap: true,   // 自动下载 bvid↔sm 映射表中该视频对应的 nico 弹幕
+    autoMap: false,  // 自动下载 bvid↔sm 映射表中该视频对应的 nico 弹幕 (默认关: 映射数据较少)
     panelX: null,
     panelY: null,
   };
@@ -929,8 +929,8 @@
             <input type="checkbox" id="ndp-visible" checked>
           </span>
           <span class="ndp-toggle-item">
-            <label class="ndp-label">自动映射</label>
-            <input type="checkbox" id="ndp-automap" checked title="打开有映射的视频时自动下载对应 nico 弹幕">
+            <label class="ndp-label">自动映射(数据较少)</label>
+            <input type="checkbox" id="ndp-automap" title="打开有映射的视频时自动下载对应 nico 弹幕">
           </span>
         </div>
         <div class="ndp-actions">
