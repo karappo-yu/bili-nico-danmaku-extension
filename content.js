@@ -32,7 +32,6 @@
   const STORAGE_KEY = 'nicoDmSettings';
   const DANMAKU_KEY = 'nicoDmFiles'; // 弹幕文件记录: { [videoId]: { name, text?, offset, ts, source } }
   const NICOCACHE_KEY = 'nicoDmNicoCache'; // niconico 精选弹幕缓存: { [smId]: { title, text, ts } }
-  const MAPPING_KEY = 'nicoDmMapping'; // 本地 bvid↔sm 映射: { [bvid]: { sm, bTitle, nTitle, ts } }
   const REMOTE_MAP_CACHE_KEY = 'nicoDmRemoteMap'; // 远程映射表缓存: { data, ts }
   const REMOTE_MAP_URL = 'https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json';
   const REMOTE_MAP_TTL = 24 * 3600 * 1000; // 远程表缓存 24h
@@ -503,9 +502,7 @@
     const text = JSON.stringify(threads);
     await loadFile(new File([text], smId + '.curated.json', { type: 'application/json' }));
     const total = countThreadComments(threads);
-    // 记录本地映射: 当前视频 → sm + 双标题 (供自动映射命中/贡献)
-    const mapKey = getMappingKey();
-    if (mapKey) saveLocalMapping(mapKey, smId, title);
+    // 不自动记录本地映射 (人工维护远程映射表)
     const info = document.getElementById('ndp-sm-info');
     if (info) {
       info.textContent = (fromCache ? '缓存' : '已下载') + ' · ' + title + ' · 精选 ' + total + ' 条';
@@ -538,7 +535,7 @@
     }
   }
 
-  // ---------- bvid ↔ sm 映射表 ----------
+  // ---------- 映射表 (远程共享, 人工维护) ----------
   // 当前 B 站视频的映射 key: 番剧 ep 号 / 普通视频 BV(+分P) / query bvid
   function getMappingKey() {
     const path = location.pathname;
@@ -550,33 +547,6 @@
     const q = location.search.match(/[?&]bvid=(BV[0-9A-Za-z]{10})/);
     if (q) return q[1] + (p ? '|p' + p[1] : '');
     return null;
-  }
-  function getBiliTitle() {
-    const el = document.querySelector('.video-info-title, .video-title, h1');
-    return el ? el.textContent.trim() : '';
-  }
-
-  // 本地映射: 下载 nico 弹幕时自动记录 (映射 key → sm + 双标题)
-  function saveLocalMapping(mapKey, sm, nTitle) {
-    if (!mapKey || !sm) return;
-    try {
-      chrome.storage.local.get(MAPPING_KEY, (res) => {
-        const all = (res && res[MAPPING_KEY]) || {};
-        const prev = all[mapKey];
-        all[mapKey] = { sm, bTitle: (prev && prev.bTitle) || getBiliTitle(), nTitle: nTitle || '', ts: Date.now() };
-        chrome.storage.local.set({ [MAPPING_KEY]: all });
-      });
-    } catch (e) {}
-  }
-  function getLocalMapping(mapKey) {
-    return new Promise((resolve) => {
-      try {
-        chrome.storage.local.get(MAPPING_KEY, (res) => {
-          const all = (res && res[MAPPING_KEY]) || {};
-          resolve(all[mapKey] || null);
-        });
-      } catch (e) { resolve(null); }
-    });
   }
 
   // 远程映射表 (GitHub mappings.json), 24h 缓存, 失败静默
@@ -594,19 +564,12 @@
       return data;
     } catch (e) { return null; }
   }
-  async function getRemoteMapping(bvid) {
-    const table = await refreshRemoteMap(false);
-    return (table && table[bvid]) || null;
-  }
 
-  // 查表: 本地映射优先 (用户自己下载过的更可信), 远程兜底
+  // 查表: 远程共享表 (人工维护), 命中 → 自动下载
   async function lookupMapping(mapKey) {
     if (!mapKey) return null;
-    const local = await getLocalMapping(mapKey);
-    if (local) return { ...local, source: 'local' };
-    const remote = await getRemoteMapping(mapKey);
-    if (remote) return { ...remote, source: 'remote' };
-    return null;
+    const table = await refreshRemoteMap(false);
+    return (table && table[mapKey]) || null;
   }
 
   // 映射命中 → 自动下载 (静默失败), 成功后显示标题对供用户核对
@@ -618,7 +581,7 @@
     if (targetVid && currentVideoId() !== targetVid) return;
     const info = document.getElementById('ndp-sm-info');
     if (info) {
-      info.textContent = '自动映射' + (m.source === 'local' ? '(本地)' : '') + ': 《' + (m.bTitle || '?') + '》 ↔ 《' + (m.nTitle || m.sm) + '》';
+      info.textContent = '自动映射: 《' + (m.bTitle || '?') + '》 ↔ 《' + (m.nTitle || m.sm) + '》';
       info.className = 'ndp-nico-info ndp-ok';
     }
   }
