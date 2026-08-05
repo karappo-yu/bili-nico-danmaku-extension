@@ -228,8 +228,7 @@
     bindEngineEvents(engine);
 
     lastVpos = -1;
-    if (video) engine.drawCanvas(vposOf(), true);
-    applyDmVisible(); // 按开关状态显示/隐藏 overlay (关 = 载入但暂不显示)
+    applyDmVisible(); // 显示/隐藏 + (开关开时)渲染首帧 — 不再单独 drawCanvas, 避免同帧重复强制渲染
     setStatus('已载入 ' + countComments(data) + ' 条', true);
   }
 
@@ -269,7 +268,7 @@
     if (settings.dmVisible) {
       if (video) resyncDmTime(); // 兜底: 关闭期间时间轴可能漂移, 打开时重新锚定
       lastVpos = -1;
-      if (engine && video) engine.drawCanvas(vposOf(), true);
+      if (engine && video) { engine.drawCanvas(vposOf(), true); lastVpos = vposOf(); } // 记录实际渲染位置, 避免 loop 误判 seek 重复强制渲染
     }
   }
 
@@ -998,7 +997,7 @@
       settings.offset = parseFloat(offsetEl.value);
       offsetValEl.textContent = (settings.offset > 0 ? '+' : '') + settings.offset.toFixed(1) + 's';
       lastVpos = -1;
-      if (engine && video) { engine.clear(); engine.drawCanvas(vposOf(), true); }
+      if (engine && video) { engine.clear(); engine.drawCanvas(vposOf(), true); lastVpos = vposOf(); }
       saveSettings();
       updateDanmakuOffset(); // 记住偏移, 刷新后恢复
     });
