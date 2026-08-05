@@ -577,6 +577,7 @@
     if (panel) return;
     panel = document.createElement('div');
     panel.id = 'nico-dm-panel';
+    panel.style.display = 'none'; // 默认隐藏, 由播放器控制条按钮唤出
     panel.innerHTML = `
       <div class="ndp-head">
         <span class="ndp-title">Nico 弹幕</span>
@@ -754,6 +755,58 @@
     unmountHost();
   }
 
+  // ---------- 播放器控制条按钮: 显示/隐藏菜单 ----------
+  let toggleBtn = null;
+  function togglePanel() {
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  }
+
+  // 幂等 + 重建安全: 元素存在但无绑定标记 (播放器重建导致监听器丢失) 时重建
+  function ensureMenuButton() {
+    const container = document.querySelector('.bpx-player-container') || document.querySelector('#bilibili-player');
+    if (!container) return;
+    const wrap = container.querySelector('.bpx-player-control-entity') || container.querySelector('.bpx-player-control-wrap');
+    // 真站按钮区: entity > bottom > bottom-right (entity 是 block 布局, 不能直接 append)
+    const bar = wrap
+      ? (wrap.querySelector('.bpx-player-control-bottom-right')
+        || wrap.querySelector('.bpx-player-control-bottom')
+        || wrap)
+      : null;
+    if (!bar) return;
+    let btn = bar.querySelector('.ndp-toggle');
+    if (btn && btn.dataset.ndpBound !== '1') { btn.remove(); btn = null; } // 无监听器的残留按钮
+    if (!btn) {
+      toggleBtn = document.createElement('div');
+      toggleBtn.className = 'bpx-player-ctrl-btn ndp-toggle';
+      toggleBtn.setAttribute('role', 'button');
+      toggleBtn.setAttribute('aria-label', 'Nico弹幕');
+      toggleBtn.title = 'Nico弹幕';
+      toggleBtn.innerHTML = '<div class="bpx-player-ctrl-btn-icon"><span class="ndp-toggle-text">N</span></div>';
+      toggleBtn.dataset.ndpBound = '1';
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        togglePanel();
+      });
+      // 插到全屏按钮前 (与设置/全屏一排)
+      const anchor = bar.querySelector('.bpx-player-ctrl-full') || bar.querySelector('.bpx-player-ctrl-setting');
+      if (anchor) bar.insertBefore(toggleBtn, anchor);
+      else bar.appendChild(toggleBtn);
+    }
+    // 点面板外关闭 (document 级, 播放器重建不失效; 只绑一次)
+    if (!document.__ndpOutsideBound) {
+      document.__ndpOutsideBound = true;
+      document.addEventListener('mousedown', (e) => {
+        if (panel && panel.style.display !== 'none' &&
+            !panel.contains(e.target) &&
+            !(toggleBtn && toggleBtn.contains(e.target))) {
+          panel.style.display = 'none';
+        }
+      });
+    }
+  }
+
   function resolve() {
     if (!isPlayerPage()) {
       teardownAll();
@@ -761,7 +814,7 @@
       return;
     }
     if (!panel) buildPanel();
-    else panel.style.display = '';
+    ensureMenuButton();
     // 视频身份变化检查: B 站切 P 常复用 video 元素 (attach 会提前 return),
     // 预加载新弹幕 ready 后一次性替换 (无清除间隙), 不等 1.5s 轮询
     if (data && loadedVideoId !== null && currentVideoId() !== loadedVideoId) {

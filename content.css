@@ -1,4 +1,11 @@
-/* ============ 浮动面板 ============ */
+/* ============ 控制条按钮 (显示/隐藏菜单) ============ */
+.ndp-toggle {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.ndp-toggle-text { color: #fff; font-size: 15px; font-weight: 700; font-style: italic; }
+
 #nico-dm-panel {
   position: fixed;
   top: 72px;
