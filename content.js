@@ -828,6 +828,19 @@
           else if (video) { mountHost(video); initEngine(); }
           setStatus(rec.name + ' · ' + countComments(data) + ' 条', true);
           switching = false;
+          // info 行同步: 若是 nico 弹幕 (sm*.curated.json), 查映射表显示新集的标题对; 否则清空
+          const info = document.getElementById('ndp-sm-info');
+          if (/^(sm|so|nm)\d+\.curated\.json$/i.test(rec.name || '')) {
+            const mapKey = getMappingKey();
+            if (mapKey) {
+              lookupMapping(mapKey).then((m) => {
+                const el = document.getElementById('ndp-sm-info');
+                if (!el) return;
+                if (m) { el.textContent = '自动映射: 《' + (m.bTitle || '?') + '》 ↔ 《' + (m.nTitle || m.sm) + '》'; el.className = 'ndp-nico-info ndp-ok'; }
+                else { el.textContent = ''; el.className = 'ndp-nico-info'; }
+              }).catch(() => {});
+            }
+          } else if (info) { info.textContent = ''; info.className = 'ndp-nico-info'; }
         }).catch((e) => {
           switching = false;
           clearDanmaku();
