@@ -566,39 +566,36 @@
     return null;
   }
 
-  // 映射表: 内置表(随扩展版本, 可信基线) + 远程增量合并, 10 分钟缓存
+  // 映射表: 内置表(扩展目录, 重载即最新, 每次读取) + 远程增量合并
   async function refreshRemoteMap(force) {
     try {
-      if (!force) {
-        const cache = await new Promise((res) => {
-          chrome.storage.local.get(REMOTE_MAP_CACHE_KEY, (r) => res((r && r[REMOTE_MAP_CACHE_KEY]) || null));
-        });
-        if (cache && cache.data && Date.now() - (cache.ts || 0) < REMOTE_MAP_TTL) return cache.data;
-      }
-      // 1. 内置表: 扩展自带 mappings.json, 随版本更新, 零网络 (可信基线)
+      // 1. 内置表: 每次查表都读本地文件 (重载扩展即最新, 不被旧缓存掩盖)
       let builtin = null;
       try {
         const b = await fetchViaBg(chrome.runtime.getURL('mappings.json'));
         if (b && typeof b === 'object') builtin = b;
       } catch (e) {}
-      // 2. 远程增量 (raw → jsDelivr), 可能滞后/被墙, 仅作补充
+      // 2. 远程增量 (缓存 10 分钟 → 过期/force 则拉取, 失败静默)
       let remote = null;
-      for (const url of REMOTE_MAP_URLS) {
-        try {
-          const d = await fetchViaBg(url);
-          if (d && typeof d === 'object') { remote = d; break; }
-        } catch (e) { /* 换下一个源 */ }
+      const cache = await new Promise((res) => {
+        chrome.storage.local.get(REMOTE_MAP_CACHE_KEY, (r) => res((r && r[REMOTE_MAP_CACHE_KEY]) || null));
+      });
+      if (!force && cache && cache.data && Date.now() - (cache.ts || 0) < REMOTE_MAP_TTL) {
+        remote = cache.data;
+      } else {
+        for (const url of REMOTE_MAP_URLS) {
+          try {
+            const d = await fetchViaBg(url);
+            if (d && typeof d === 'object') { remote = d; break; }
+          } catch (e) { /* 换下一个源 */ }
+        }
+        if (remote) chrome.storage.local.set({ [REMOTE_MAP_CACHE_KEY]: { data: remote, ts: Date.now() } });
       }
       // 3. 合并: 内置优先 (同 key 覆盖远程旧表), 远程独有新条目保留
-      //    (防止 jsDelivr 缓存滞后返回旧表时把新内置表冲掉)
       let data = null;
       if (remote && typeof remote === 'object') data = Object.assign({}, remote);
       if (builtin && typeof builtin === 'object') data = Object.assign({}, data, builtin);
-      if (data && typeof data === 'object') {
-        chrome.storage.local.set({ [REMOTE_MAP_CACHE_KEY]: { data, ts: Date.now() } });
-        return data;
-      }
-      return null;
+      return data;
     } catch (e) { return null; }
   }
 
