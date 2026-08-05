@@ -897,7 +897,7 @@
           <span class="ndp-file-name" id="ndp-file-name">未选择</span>
         </div>
         <div class="ndp-nico">
-          <input id="ndp-sm" placeholder="niconico: sm9 或完整 URL" spellcheck="false">
+          <input id="ndp-sm" placeholder="niconico: sm9 或完整 URL" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" name="ndp-sm-random">
           <div class="ndp-nico-btns">
             <button class="ndp-btn" id="ndp-sm-fetch">下载精选弹幕</button>
           </div>
