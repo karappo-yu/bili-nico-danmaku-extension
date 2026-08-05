@@ -354,6 +354,11 @@
       loadedVideoId = currentVideoId();
       if (fileNameEl) fileNameEl.textContent = file.name;
       syncSmInput(file.name);
+      // info 行按来源区分: 本地文件 → 显示文件名; nico 弹幕 (sm*.curated.json) → 由调用方显示映射/下载信息
+      if (!/^(sm|so|nm)\d+\.curated\.json$/i.test(file.name)) {
+        const info = document.getElementById('ndp-sm-info');
+        if (info) { info.textContent = '本地文件: ' + file.name; info.className = 'ndp-nico-info'; }
+      }
       await saveDanmakuRecord(loadedVideoId, file.name, text, currentHandle); // 记住关联, 刷新后自动加载
       resyncDmTime();
       if (host) initEngine();
@@ -840,7 +845,7 @@
                 else { el.textContent = ''; el.className = 'ndp-nico-info'; }
               }).catch(() => {});
             }
-          } else if (info) { info.textContent = ''; info.className = 'ndp-nico-info'; }
+          } else if (info) { info.textContent = '本地文件: ' + (rec.name || ''); info.className = 'ndp-nico-info'; }
         }).catch((e) => {
           switching = false;
           clearDanmaku();
