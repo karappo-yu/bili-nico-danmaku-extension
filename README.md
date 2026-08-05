@@ -26,6 +26,7 @@
 4. B 站源与 nico 原视频时间轴不一致时,拖「偏移」滑块对齐(正=弹幕提前,负=延后)
 5. 字号/透明度即时生效;B 站原生弹幕用播放器自带的弹幕开关控制
 6. 「显示弹幕」开关:临时隐藏/显示 N 站弹幕(保留视频与文件的关联,与「清除弹幕」不同)
+7. **niconico 精选弹幕**:输入 sm 号或视频 URL(如 `sm9` / `https://www.nicovideo.jp/watch/sm9`)→「下载精选弹幕」自动获取该视频的精选弹幕并**缓存到本地**,下次直接读缓存;「刷新缓存」强制重新下载
 
 ### 自动记忆
 
@@ -51,6 +52,7 @@
 
 - `content.js` — 播放器解析、overlay 挂载、文件载入、rAF 同步循环、偏移/字号/透明度、SPA 重挂载(MutationObserver);仅在视频页(/video/、/bangumi/play/、/list/)创建面板
 - `content.css` — 面板 UI
+- `background.js` — MV3 service worker:代理 niconico API 请求(content script 受页面 CORS 限制,凭 host_permissions 匿名拉取公开弹幕)
 - `lib/bundle.js` — [niconicomments](https://github.com/xpadev-net/niconicomments) v0.3.1 bundle(含 CSSRenderer)
 - `lib/input.js` — XML/JSON 解析(同 iina-plugin-danmaku-cosmos)
 - `test-data/sample-nico.json` — 68 条 v1 格式测试弹幕
@@ -86,3 +88,4 @@ node test/harness/server.js 8766   # 支持 Range 的静态服务器 (python htt
 - CA 弹幕的 `@jump` 跳转忽略(浏览器端无多视频切换语义)
 - 原生 B 站弹幕不处理:用播放器自带的弹幕开关控制
 - 文件句柄模式(File System Access API)仅 Chrome 支持;Firefox/Safari 自动走"存文件内容"降级路径
+- niconico 精选弹幕匿名下载:无登录只能获取公开弹幕;付费/登录限定内容无法下载(可自行用本地文件加载)

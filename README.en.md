@@ -25,6 +25,7 @@ Pick a nico danmaku JSON/XML file → the comments are overlaid on the Bilibili 
 3. If the Bilibili source and the original nico video timelines differ, drag the **Offset** slider to align (positive = comments earlier, negative = later)
 4. Font size / opacity apply immediately; native Bilibili comments are controlled by the player's own danmaku toggle
 5. **Show danmaku** toggle: temporarily hide/show nico comments (keeps the video↔file association; unlike **Clear danmaku**)
+6. **niconico curated comments**: enter a video ID or URL (e.g. `sm9` / `https://www.nicovideo.jp/watch/sm9`) → **Download curated comments** fetches the video's curated comments and **caches them locally** (next time reads from cache); **Refresh cache** forces a fresh download
 
 ### Automatic memory
 
@@ -85,3 +86,4 @@ Automation hook in the harness console: `window.postMessage({type:'nico-dm:load'
 - CA comments' `@jump` is ignored (no multi-video switching semantics in a browser context)
 - Native Bilibili comments are not touched — use the player's own danmaku toggle
 - File-handle mode (File System Access API) is Chrome-only; Firefox/Safari automatically use the "store file content" fallback
+- Anonymous niconico curated download: only public comments are available without login; paid/login-only content cannot be downloaded (load such files locally instead)

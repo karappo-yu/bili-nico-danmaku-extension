@@ -26,8 +26,42 @@
           clear(cb) { Object.keys(data).forEach(k => delete data[k]); persist(); cb && setTimeout(cb, 0); },
           _dump() { return data; }
         }
+      },
+      // ===== chrome.runtime mock: 模拟 background 代理 (niconico API) =====
+      // 计数验证缓存/刷新行为: 下载应触发请求, 缓存命中不应触发
+      runtime: {
+        lastError: null,
+        sendMessage(msg, cb) {
+          if (msg && msg.type === 'nico-dm:fetch') {
+            window.__fetchLog.push(msg.url);
+            if (msg.url.includes('/watch/')) {
+              cb({ ok: true, data: { data: { response: {
+                comment: { nvComment: {
+                  server: 'https://mock.nvcomment.nicovideo.jp',
+                  threadKey: 'mock-key',
+                  params: { targets: [{ id: '1', fork: 'main' }, { id: '2', fork: 'easy' }], language: 'ja-jp' },
+                } },
+                video: { title: 'モック動画' },
+              } } } });
+            } else if (msg.url.includes('/v1/threads')) {
+              const fork = JSON.parse(msg.opts.body).params.targets[0].fork;
+              const comments = [1, 2].map((i) => ({
+                id: fork + '-' + i, no: i, vposMs: 8000 + i * 4000,
+                body: fork + ' comment ' + i, commands: [], userId: 'u' + i,
+                isPremium: false, score: 0, postedAt: '2025-01-01T00:00:0' + i + '+09:00',
+                nicoruCount: 0, nicoruId: null, source: 'api', isMyPost: false,
+              }));
+              cb({ ok: true, data: { data: { threads: [{ comments }] } } });
+            } else {
+              cb({ ok: false, error: 'mock 404' });
+            }
+          } else {
+            cb({ ok: false, error: 'unknown msg' });
+          }
+        }
       }
     };
+    window.__fetchLog = [];
     // ===== showOpenFilePicker mock: 返回可被 IDB 克隆的 fake handle =====
     // 记录调用次数: 自动加载从 handle 读文件时不应再弹 picker
     window.__pickCount = 0;

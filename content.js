@@ -30,6 +30,7 @@
   };
   const STORAGE_KEY = 'nicoDmSettings';
   const DANMAKU_KEY = 'nicoDmFiles'; // 弹幕文件记录: { [videoId]: { name, text?, offset, ts, source } }
+  const NICOCACHE_KEY = 'nicoDmNicoCache'; // niconico 精选弹幕缓存: { [smId]: { title, text, ts } }
   // source: 'handle' = 本地文件句柄 (IDB, 直接读盘, 不占 storage); 'content' = 文件内容 (storage, fallback)
 
   // ---------- IndexedDB: 本地文件句柄持久化 ----------
@@ -285,7 +286,7 @@
   // ---------- 文件载入 ----------
   function countComments(d) {
     if (!Array.isArray(d)) return 0;
-    if (d[0] && Array.isArray(d[0].comments)) return d[0].comments.length;
+    if (d[0] && Array.isArray(d[0].comments)) return d.reduce((n, t) => n + (t.comments ? t.comments.length : 0), 0); // v1 多 fork
     return d.length;
   }
 
@@ -395,6 +396,118 @@
       if (k !== vid && (normVidKey(k) === vid || looseNorm(k) === vn)) keys.push(k);
     }
     return keys;
+  }
+
+  // ---------- niconico 精选弹幕下载 (经 background 代理, 匿名) ----------
+  function fetchViaBg(url, opts) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'nico-dm:fetch', url, opts }, (res) => {
+          if (chrome.runtime.lastError) { reject(new Error(chrome.runtime.lastError.message)); return; }
+          if (!res || !res.ok) { reject(new Error((res && res.error) || '请求失败')); return; }
+          resolve(res.data);
+        });
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function parseSmInput(input) {
+    const m = String(input || '').trim().match(/(?:nicovideo\.jp\/watch\/)?(sm\d+|so\d+|nm\d+)/i);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  // watch 页 json: 拿 nvComment (server/threadKey/targets) + 标题
+  async function fetchNicoWatch(smId) {
+    const data = await fetchViaBg('https://www.nicovideo.jp/watch/' + smId + '?responseType=json', {
+      headers: { 'User-Agent': 'Mozilla/5.0', 'X-Frontend-Id': '6', 'X-Frontend-Version': '0' },
+    });
+    const resp = data && data.data && data.data.response;
+    const nv = resp && resp.comment && resp.comment.nvComment;
+    if (!nv || !nv.server || !nv.threadKey) throw new Error('无法获取视频信息 (可能不存在或需登录)');
+    const title = (resp.video && resp.video.title) || smId;
+    return { nv, title };
+  }
+
+  // 精选 (curated): 不带 additionals, 每个 fork 拉最近一轮, 与网页端一致
+  async function fetchCuratedThreads(nv) {
+    const { server, threadKey, params } = nv;
+    const threads = [];
+    for (const t of params.targets) {
+      const res = await fetchViaBg(server + '/v1/threads', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=UTF-8',
+          'User-Agent': 'Mozilla/5.0',
+          'X-Frontend-Id': '6',
+          'X-Frontend-Version': '0',
+        },
+        body: JSON.stringify({ threadKey, params: { language: params.language, targets: [t] } }),
+      });
+      const comments = (res.data && res.data.threads && res.data.threads[0] && res.data.threads[0].comments) || [];
+      threads.push({ id: t.id, fork: t.fork, comments }); // v1 格式: fork 对象需 id/fork/comments
+    }
+    return threads;
+  }
+
+  function countThreadComments(threads) {
+    return (threads || []).reduce((n, t) => n + (t.comments ? t.comments.length : 0), 0);
+  }
+
+  // 缓存: smId → {title, text(v1 JSON), ts}
+  function readNicoCache(smId) {
+    return new Promise((resolve) => {
+      try {
+        chrome.storage.local.get(NICOCACHE_KEY, (res) => {
+          const all = (res && res[NICOCACHE_KEY]) || {};
+          resolve(all[smId] || null);
+        });
+      } catch (e) { resolve(null); }
+    });
+  }
+  function writeNicoCache(smId, rec) {
+    try {
+      chrome.storage.local.get(NICOCACHE_KEY, (res) => {
+        const all = (res && res[NICOCACHE_KEY]) || {};
+        all[smId] = rec;
+        chrome.storage.local.set({ [NICOCACHE_KEY]: all });
+      });
+    } catch (e) {}
+  }
+
+  // 加载弹幕 (走 loadFile: 自动识别格式 + 关联当前 bvid + 记忆偏移)
+  async function loadNicoComments(smId, title, threads, fromCache) {
+    const text = JSON.stringify(threads);
+    await loadFile(new File([text], smId + '.curated.json', { type: 'application/json' }));
+    const total = countThreadComments(threads);
+    const info = document.getElementById('ndp-sm-info');
+    if (info) {
+      info.textContent = (fromCache ? '缓存' : '已下载') + ' · ' + title + ' · 精选 ' + total + ' 条';
+      info.className = 'ndp-nico-info ndp-ok';
+    }
+  }
+
+  async function downloadNico(smId, force) {
+    const info = document.getElementById('ndp-sm-info');
+    const setInfo = (msg, cls) => { if (info) { info.textContent = msg; info.className = 'ndp-nico-info' + (cls ? ' ' + cls : ''); } };
+    if (!smId) { setInfo('请输入 sm 号或视频 URL', 'ndp-err'); return; }
+    try {
+      setInfo('正在获取 ' + smId + ' ...', '');
+      if (!force) {
+        const cached = await readNicoCache(smId);
+        if (cached && cached.text) {
+          await loadNicoComments(smId, cached.title || smId, JSON.parse(cached.text), true);
+          return;
+        }
+      }
+      const { nv, title } = await fetchNicoWatch(smId);
+      const threads = await fetchCuratedThreads(nv);
+      const total = countThreadComments(threads);
+      if (total === 0) throw new Error('该视频没有可用的公开弹幕');
+      writeNicoCache(smId, { title, text: JSON.stringify(threads), ts: Date.now() });
+      await loadNicoComments(smId, title, threads, false);
+    } catch (e) {
+      setInfo('失败: ' + (e && e.message || e), 'ndp-err');
+    }
   }
 
   // ---------- 弹幕文件关联记忆 ----------
@@ -601,6 +714,14 @@
           <button class="ndp-file-btn" id="ndp-pick">📂 选择弹幕文件</button>
           <span class="ndp-file-name" id="ndp-file-name">未选择</span>
         </div>
+        <div class="ndp-nico">
+          <input id="ndp-sm" placeholder="niconico: sm9 或完整 URL" spellcheck="false">
+          <div class="ndp-nico-btns">
+            <button class="ndp-btn" id="ndp-sm-fetch">下载精选弹幕</button>
+            <button class="ndp-btn" id="ndp-sm-refresh" title="忽略缓存, 重新从 niconico 下载">刷新缓存</button>
+          </div>
+          <div class="ndp-nico-info" id="ndp-sm-info"></div>
+        </div>
         <div class="ndp-row">
           <label class="ndp-label">偏移</label>
           <input type="range" id="ndp-offset" min="-120" max="120" step="0.5" value="0">
@@ -677,6 +798,23 @@
       applyDmVisible();
       saveSettings();
     });
+    const smInput = $('#ndp-sm');
+    const smFetchBtn = $('#ndp-sm-fetch');
+    const smRefreshBtn = $('#ndp-sm-refresh');
+    let nicoBusy = false;
+    const runNico = (force) => {
+      if (nicoBusy) return;
+      const smId = parseSmInput(smInput.value);
+      nicoBusy = true;
+      smFetchBtn.disabled = smRefreshBtn.disabled = true;
+      downloadNico(smId, force).finally(() => {
+        nicoBusy = false;
+        smFetchBtn.disabled = smRefreshBtn.disabled = false;
+      });
+    };
+    smFetchBtn.addEventListener('click', () => runNico(false));
+    smRefreshBtn.addEventListener('click', () => runNico(true));
+    smInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') runNico(false); });
     panel.querySelector('.ndp-collapse').addEventListener('click', () => {
       panel.classList.toggle('ndp-collapsed');
     });
