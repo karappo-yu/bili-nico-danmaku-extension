@@ -27,13 +27,26 @@
           _dump() { return data; }
         }
       },
+      // ===== chrome.cookies mock: 模拟已登录 niconico (localStorage 里可设置) =====
+      cookies: {
+        get(info, cb) {
+          const v = localStorage.getItem('__ndp_mock_session');
+          setTimeout(() => cb(v ? { name: 'user_session', value: v } : null), 0);
+        }
+      },
       // ===== chrome.runtime mock: 模拟 background 代理 (niconico API) =====
       // 计数验证缓存/刷新行为: 下载应触发请求, 缓存命中不应触发
       runtime: {
         lastError: null,
         sendMessage(msg, cb) {
           if (msg && msg.type === 'nico-dm:fetch') {
-            window.__fetchLog.push(msg.url);
+            // 模拟 background: 有登录 cookie 时附加 Cookie 头
+            const opts = msg.opts || {};
+            const session = localStorage.getItem('__ndp_mock_session');
+            if (msg.useSession !== false && session) {
+              opts.headers = Object.assign({}, opts.headers, { Cookie: 'user_session=' + session });
+            }
+            window.__fetchLog.push({ url: msg.url, hasCookie: !!(opts.headers && opts.headers.Cookie) });
             if (msg.url.includes('/watch/')) {
               cb({ ok: true, data: { data: { response: {
                 comment: { nvComment: {
