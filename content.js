@@ -599,6 +599,18 @@
     } catch (e) { return null; }
   }
 
+  // info 行显示当前视频的映射标题对 (自动加载/切集后同步用)
+  function syncMapInfo() {
+    const mapKey = getMappingKey();
+    if (!mapKey) return;
+    lookupMapping(mapKey).then((m) => {
+      const el = document.getElementById('ndp-sm-info');
+      if (!el) return;
+      if (m) { el.textContent = '自动映射: 《' + (m.nTitle || m.sm) + '》'; el.className = 'ndp-nico-info ndp-ok'; }
+      else { el.textContent = ''; el.className = 'ndp-nico-info'; }
+    }).catch(() => {});
+  }
+
   // 查表: 远程共享表 (人工维护), 命中 → 自动下载
   // 表结构: { shows: { 番名: { biliSeason, nicoSeries, eps: { key: {sm,bTitle,nTitle} } } }, videos: { key: {...} } }
   async function lookupMapping(mapKey) {
@@ -764,6 +776,8 @@
           settle();
           applyStoredOffset(vid);
           loadFile(new File([rec.text], rec.name || 'auto-danmaku.json', { type: 'application/json' }));
+          // 自动加载的 nico 弹幕 → info 行显示映射标题对 (刷新后不丢失映射信息)
+          if (/^(sm|so|nm)\d+\.curated\.json$/i.test(rec.name || '')) syncMapInfo();
         });
       } catch (e) { settle(); }
     };
@@ -833,19 +847,10 @@
           else if (video) { mountHost(video); initEngine(); }
           setStatus(rec.name + ' · ' + countComments(data) + ' 条', true);
           switching = false;
-          // info 行同步: 若是 nico 弹幕 (sm*.curated.json), 查映射表显示新集的标题对; 否则清空
+          // info 行同步: 若是 nico 弹幕 (sm*.curated.json), 查映射表显示新集的标题对; 否则显示本地文件
           const info = document.getElementById('ndp-sm-info');
-          if (/^(sm|so|nm)\d+\.curated\.json$/i.test(rec.name || '')) {
-            const mapKey = getMappingKey();
-            if (mapKey) {
-              lookupMapping(mapKey).then((m) => {
-                const el = document.getElementById('ndp-sm-info');
-                if (!el) return;
-                if (m) { el.textContent = '自动映射: 《' + (m.nTitle || m.sm) + '》'; el.className = 'ndp-nico-info ndp-ok'; }
-                else { el.textContent = ''; el.className = 'ndp-nico-info'; }
-              }).catch(() => {});
-            }
-          } else if (info) { info.textContent = '本地文件: ' + (rec.name || ''); info.className = 'ndp-nico-info'; }
+          if (/^(sm|so|nm)\d+\.curated\.json$/i.test(rec.name || '')) syncMapInfo();
+          else if (info) { info.textContent = '本地文件: ' + (rec.name || ''); info.className = 'ndp-nico-info'; }
         }).catch((e) => {
           switching = false;
           clearDanmaku();
