@@ -503,9 +503,9 @@
     const text = JSON.stringify(threads);
     await loadFile(new File([text], smId + '.curated.json', { type: 'application/json' }));
     const total = countThreadComments(threads);
-    // 记录本地映射: bvid → sm + 双标题 (供自动映射命中/贡献)
-    const bvid = getBvid();
-    if (bvid) saveLocalMapping(bvid, smId, title);
+    // 记录本地映射: 当前视频 → sm + 双标题 (供自动映射命中/贡献)
+    const mapKey = getMappingKey();
+    if (mapKey) saveLocalMapping(mapKey, smId, title);
     const info = document.getElementById('ndp-sm-info');
     if (info) {
       info.textContent = (fromCache ? '缓存' : '已下载') + ' · ' + title + ' · 精选 ' + total + ' 条';
@@ -539,35 +539,41 @@
   }
 
   // ---------- bvid ↔ sm 映射表 ----------
-  function getBvid() {
-    const p = location.pathname.match(/\/(BV[0-9A-Za-z]{10})\/?/);
-    if (p) return p[1];
+  // 当前 B 站视频的映射 key: 番剧 ep 号 / 普通视频 BV(+分P) / query bvid
+  function getMappingKey() {
+    const path = location.pathname;
+    const ep = path.match(/\/bangumi\/play\/ep(\d+)/);
+    if (ep) return 'ep' + ep[1];
+    const p = location.search.match(/[?&]p=(\d+)/);
+    const bv = path.match(/\/(BV[0-9A-Za-z]{10})\/?/);
+    if (bv) return bv[1] + (p ? '|p' + p[1] : '');
     const q = location.search.match(/[?&]bvid=(BV[0-9A-Za-z]{10})/);
-    return q ? q[1] : null;
+    if (q) return q[1] + (p ? '|p' + p[1] : '');
+    return null;
   }
   function getBiliTitle() {
     const el = document.querySelector('.video-info-title, .video-title, h1');
     return el ? el.textContent.trim() : '';
   }
 
-  // 本地映射: 下载 nico 弹幕时自动记录 (bvid → sm + 双标题)
-  function saveLocalMapping(bvid, sm, nTitle) {
-    if (!bvid || !sm) return;
+  // 本地映射: 下载 nico 弹幕时自动记录 (映射 key → sm + 双标题)
+  function saveLocalMapping(mapKey, sm, nTitle) {
+    if (!mapKey || !sm) return;
     try {
       chrome.storage.local.get(MAPPING_KEY, (res) => {
         const all = (res && res[MAPPING_KEY]) || {};
-        const prev = all[bvid];
-        all[bvid] = { sm, bTitle: (prev && prev.bTitle) || getBiliTitle(), nTitle: nTitle || '', ts: Date.now() };
+        const prev = all[mapKey];
+        all[mapKey] = { sm, bTitle: (prev && prev.bTitle) || getBiliTitle(), nTitle: nTitle || '', ts: Date.now() };
         chrome.storage.local.set({ [MAPPING_KEY]: all });
       });
     } catch (e) {}
   }
-  function getLocalMapping(bvid) {
+  function getLocalMapping(mapKey) {
     return new Promise((resolve) => {
       try {
         chrome.storage.local.get(MAPPING_KEY, (res) => {
           const all = (res && res[MAPPING_KEY]) || {};
-          resolve(all[bvid] || null);
+          resolve(all[mapKey] || null);
         });
       } catch (e) { resolve(null); }
     });
@@ -594,11 +600,11 @@
   }
 
   // 查表: 本地映射优先 (用户自己下载过的更可信), 远程兜底
-  async function lookupMapping(bvid) {
-    if (!bvid) return null;
-    const local = await getLocalMapping(bvid);
+  async function lookupMapping(mapKey) {
+    if (!mapKey) return null;
+    const local = await getLocalMapping(mapKey);
     if (local) return { ...local, source: 'local' };
-    const remote = await getRemoteMapping(bvid);
+    const remote = await getRemoteMapping(mapKey);
     if (remote) return { ...remote, source: 'remote' };
     return null;
   }
@@ -714,12 +720,12 @@
                 setStatus('未找到该视频的关联弹幕, 请选择文件', 'err');
               }, 2000);
             };
-            // 无本地关联 → 查 bvid↔sm 映射表 (开关开时自动下载)
+            // 无本地关联 → 查映射表 (开关开时自动下载)
             if (!settings.autoMap) { notifyNotFound(); return; }
-            const bvid = getBvid();
-            if (!bvid) { notifyNotFound(); return; }
+            const mapKey = getMappingKey();
+            if (!mapKey) { notifyNotFound(); return; }
             try {
-              lookupMapping(bvid).then((m) => {
+              lookupMapping(mapKey).then((m) => {
                 if (!m) { notifyNotFound(); return; }
                 if (data || currentVideoId() !== vid) return; // 已加载/切走
                 autoDownloadFromMapping(m, vid);
@@ -770,9 +776,9 @@
             }, 2000);
           };
           if (settings.autoMap) {
-            const bvid = getBvid();
-            if (bvid) {
-              lookupMapping(bvid).then((m) => {
+            const mapKey = getMappingKey();
+            if (mapKey) {
+              lookupMapping(mapKey).then((m) => {
                 if (!m) { notifyNotFound(); return; }
                 if (data || currentVideoId() !== newVid) return;
                 autoDownloadFromMapping(m, newVid);
