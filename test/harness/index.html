@@ -38,6 +38,7 @@
       // 计数验证缓存/刷新行为: 下载应触发请求, 缓存命中不应触发
       runtime: {
         lastError: null,
+        getURL: (p) => '/__ndp_builtin__/' + p,
         sendMessage(msg, cb) {
           if (msg && msg.type === 'nico-dm:fetch') {
             // 模拟 background: 有登录 cookie 时附加 Cookie 头
@@ -47,7 +48,10 @@
               opts.headers = Object.assign({}, opts.headers, { Cookie: 'user_session=' + session });
             }
             window.__fetchLog.push({ url: msg.url, hasCookie: !!(opts.headers && opts.headers.Cookie) });
-            if (msg.url.includes('/watch/')) {
+            if (msg.url.includes('__ndp_builtin__')) {
+              // 扩展内置表 mock: 空 (测试走远程更新路径)
+              cb({ ok: true, data: {} });
+            } else if (msg.url.includes('/watch/')) {
               cb({ ok: true, data: { data: { response: {
                 comment: { nvComment: {
                   server: 'https://mock.nvcomment.nicovideo.jp',
@@ -60,7 +64,9 @@
               // 远程映射表 mock (与 mappings.json 同步)
               cb({ ok: true, data: {
                 'BV1TEST12345': { sm: 'sm9', bTitle: '【测试】示例视频', nTitle: 'テスト用動画' },
-                'ss73081': { sm: 'so44461978', bTitle: '颂乐人偶', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' }
+                'ss73081': { sm: 'so44461978', bTitle: '颂乐人偶', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
+                'ep1231523': { sm: 'so44461978', bTitle: '第1话 秘密。(Sub rosa.)', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' },
+                'ep1449272': { sm: 'so44809405', bTitle: '第13话 循此苦旅,终抵繁星。', nTitle: 'BanG Dream! Ave Mujica #13「Per aspera ad astra.」' }
               } });
             } else if (msg.url.includes('/v1/threads')) {
               const fork = JSON.parse(msg.opts.body).params.targets[0].fork;

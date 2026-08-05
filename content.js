@@ -554,7 +554,7 @@
     return null;
   }
 
-  // 远程映射表 (GitHub raw + jsDelivr 备用), 10 分钟缓存, 失败静默
+  // 远程映射表: 内置表(随扩展版本, 零网络) 兜底 + raw/jsDelivr 增量更新, 10 分钟缓存
   async function refreshRemoteMap(force) {
     try {
       if (!force) {
@@ -563,16 +563,20 @@
         });
         if (cache && cache.data && Date.now() - (cache.ts || 0) < REMOTE_MAP_TTL) return cache.data;
       }
-      let data = null;
+      // 1. 内置表: 扩展自带 mappings.json, 随版本更新, 不依赖网络
+      let data = await fetchViaBg(chrome.runtime.getURL('mappings.json')).catch(() => null);
+      // 2. 远程增量更新 (raw → jsDelivr), 失败退回内置表
       for (const url of REMOTE_MAP_URLS) {
         try {
-          data = await fetchViaBg(url);
-          if (data && typeof data === 'object') break;
+          const d = await fetchViaBg(url);
+          if (d && typeof d === 'object') { data = d; break; }
         } catch (e) { /* 换下一个源 */ }
       }
-      if (!data || typeof data !== 'object') return null;
-      chrome.storage.local.set({ [REMOTE_MAP_CACHE_KEY]: { data, ts: Date.now() } });
-      return data;
+      if (data && typeof data === 'object') {
+        chrome.storage.local.set({ [REMOTE_MAP_CACHE_KEY]: { data, ts: Date.now() } });
+        return data;
+      }
+      return null;
     } catch (e) { return null; }
   }
 
