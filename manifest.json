@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "NicoDanmaku for Bilibili",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "在 B 站播放器上直接播放 niconico 弹幕 JSON/XML。选文件 → 弹幕跟着视频走。",
   "permissions": ["storage", "unlimitedStorage"],
   "content_scripts": [
