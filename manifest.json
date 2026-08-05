@@ -5,7 +5,7 @@
   "description": "在 B 站播放器上直接播放 niconico 弹幕 JSON/XML。选文件 → 弹幕跟着视频走。支持输入 sm 号直接下载精选弹幕 + bvid↔sm 自动映射。",
   "permissions": ["storage", "unlimitedStorage", "cookies"],
   "background": { "service_worker": "background.js" },
-  "host_permissions": ["https://*.nicovideo.jp/*", "https://raw.githubusercontent.com/*", "https://cdn.jsdelivr.net/*"],
+  "host_permissions": ["https://*.nicovideo.jp/*", "https://raw.githubusercontent.com/*", "https://cdn.jsdelivr.net/*", "https://ghproxy.net/*", "https://gh-proxy.com/*", "https://ghfast.top/*"],
   "content_scripts": [
     {
       "matches": [

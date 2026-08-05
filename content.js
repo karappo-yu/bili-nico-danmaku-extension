@@ -35,7 +35,10 @@
   const REMOTE_MAP_CACHE_KEY = 'nicoDmRemoteMap'; // 远程映射表缓存: { data, ts }
   const REMOTE_MAP_URLS = [
     'https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json',
-    'https://cdn.jsdelivr.net/gh/karappo-yu/bili-nico-danmaku-extension@main/mappings.json', // 国内可达备用
+    'https://ghproxy.net/https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json', // 国内代理
+    'https://gh-proxy.com/https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json', // 国内代理
+    'https://ghfast.top/https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json', // 国内代理
+    'https://cdn.jsdelivr.net/gh/karappo-yu/bili-nico-danmaku-extension@main/mappings.json', // CDN (缓存滞后, 最后兜底)
   ];
   const REMOTE_MAP_TTL = 10 * 60 * 1000; // 映射表缓存 10 分钟 (改表后快速生效)
   // source: 'handle' = 本地文件句柄 (IDB, 直接读盘, 不占 storage); 'content' = 文件内容 (storage, fallback)
