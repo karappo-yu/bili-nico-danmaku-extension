@@ -57,9 +57,10 @@
                 video: { title: 'モック動画' },
               } } } });
             } else if (msg.url.includes('raw.githubusercontent.com')) {
-              // 远程映射表 mock
+              // 远程映射表 mock (与 mappings.json 同步)
               cb({ ok: true, data: {
-                'BV1TEST12345': { sm: 'sm9', bTitle: '【测试】示例视频', nTitle: 'テスト用動画' }
+                'BV1TEST12345': { sm: 'sm9', bTitle: '【测试】示例视频', nTitle: 'テスト用動画' },
+                'ss73081': { sm: 'so44461978', bTitle: '颂乐人偶', nTitle: 'BanG Dream! Ave Mujica #1「Sub rosa.」' }
               } });
             } else if (msg.url.includes('/v1/threads')) {
               const fork = JSON.parse(msg.opts.body).params.targets[0].fork;

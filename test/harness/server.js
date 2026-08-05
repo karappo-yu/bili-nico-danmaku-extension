@@ -17,8 +17,8 @@ const MIME = {
 
 http.createServer((req, res) => {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
-  // 番剧路径模拟: /bangumi/play/ep* → 测试台 (映射 key = ep 号)
-  if (/^\/bangumi\/play\/ep\d+/.test(urlPath)) urlPath = '/video/index.html';
+  // 番剧路径模拟: /bangumi/play/ep* 或 ss* → 测试台 (映射 key = ep/ss 号)
+  if (/^\/bangumi\/play\/(ep|ss)\d+/.test(urlPath)) urlPath = '/video/index.html';
   const p = path.join(root, urlPath);
   fs.stat(p, (err, st) => {
     if (err || !st.isFile()) { res.writeHead(404); res.end('not found'); return; }

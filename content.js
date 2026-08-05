@@ -536,11 +536,13 @@
   }
 
   // ---------- 映射表 (远程共享, 人工维护) ----------
-  // 当前 B 站视频的映射 key: 番剧 ep 号 / 普通视频 BV(+分P) / query bvid
+  // 当前 B 站视频的映射 key: 番剧 ep/ss 号 / 普通视频 BV(+分P) / query bvid
   function getMappingKey() {
     const path = location.pathname;
     const ep = path.match(/\/bangumi\/play\/ep(\d+)/);
     if (ep) return 'ep' + ep[1];
+    const ss = path.match(/\/bangumi\/play\/ss(\d+)/); // 番剧合集首页 (URL 保持 ss 不跳转)
+    if (ss) return 'ss' + ss[1];
     const p = location.search.match(/[?&]p=(\d+)/);
     const bv = path.match(/\/(BV[0-9A-Za-z]{10})\/?/);
     if (bv) return bv[1] + (p ? '|p' + p[1] : '');
