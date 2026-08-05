@@ -376,6 +376,9 @@
     fileNameEl.textContent = '未选择文件';
     syncSmInput(''); // 清除/切到无关联视频 → 输入框清空, 防残留上个视频的视频号
     setStatus('');
+    // 同时清空 nico 区 info 行 (自动映射标题对/下载状态), 防残留上个视频的信息
+    const nicoInfo = document.getElementById('ndp-sm-info');
+    if (nicoInfo) { nicoInfo.textContent = ''; nicoInfo.className = 'ndp-nico-info'; }
     // 注意: 不删关联记录! 切集自动清除时 URL 已是新视频,
     // 若在这里删记录会误删新视频的关联 (死逻辑)。删除只发生在手动清除。
   }
