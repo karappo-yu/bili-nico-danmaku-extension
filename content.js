@@ -33,8 +33,11 @@
   const DANMAKU_KEY = 'nicoDmFiles'; // 弹幕文件记录: { [videoId]: { name, text?, offset, ts, source } }
   const NICOCACHE_KEY = 'nicoDmNicoCache'; // niconico 精选弹幕缓存: { [smId]: { title, text, ts } }
   const REMOTE_MAP_CACHE_KEY = 'nicoDmRemoteMap'; // 远程映射表缓存: { data, ts }
-  const REMOTE_MAP_URL = 'https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json';
-  const REMOTE_MAP_TTL = 24 * 3600 * 1000; // 远程表缓存 24h
+  const REMOTE_MAP_URLS = [
+    'https://raw.githubusercontent.com/karappo-yu/bili-nico-danmaku-extension/main/mappings.json',
+    'https://cdn.jsdelivr.net/gh/karappo-yu/bili-nico-danmaku-extension@main/mappings.json', // 国内可达备用
+  ];
+  const REMOTE_MAP_TTL = 10 * 60 * 1000; // 映射表缓存 10 分钟 (改表后快速生效)
   // source: 'handle' = 本地文件句柄 (IDB, 直接读盘, 不占 storage); 'content' = 文件内容 (storage, fallback)
 
   // ---------- IndexedDB: 本地文件句柄持久化 ----------
@@ -551,7 +554,7 @@
     return null;
   }
 
-  // 远程映射表 (GitHub mappings.json), 24h 缓存, 失败静默
+  // 远程映射表 (GitHub raw + jsDelivr 备用), 10 分钟缓存, 失败静默
   async function refreshRemoteMap(force) {
     try {
       if (!force) {
@@ -560,7 +563,13 @@
         });
         if (cache && cache.data && Date.now() - (cache.ts || 0) < REMOTE_MAP_TTL) return cache.data;
       }
-      const data = await fetchViaBg(REMOTE_MAP_URL);
+      let data = null;
+      for (const url of REMOTE_MAP_URLS) {
+        try {
+          data = await fetchViaBg(url);
+          if (data && typeof data === 'object') break;
+        } catch (e) { /* 换下一个源 */ }
+      }
       if (!data || typeof data !== 'object') return null;
       chrome.storage.local.set({ [REMOTE_MAP_CACHE_KEY]: { data, ts: Date.now() } });
       return data;
