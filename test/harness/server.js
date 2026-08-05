@@ -41,6 +41,7 @@ http.createServer((req, res) => {
         'Content-Type': type,
         'Content-Length': st.size,
         'Accept-Ranges': 'bytes',
+        'Cache-Control': 'no-store', // 测试台禁用缓存 (浏览器会缓存旧版 content.js/index.html)
       });
       fs.createReadStream(p).pipe(res);
     }

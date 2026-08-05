@@ -4,20 +4,147 @@
       "biliSeason": "ss73081",
       "nicoSeries": 497560,
       "eps": {
-        "ss73081": { "sm": "so44461978", "bTitle": "合集首页", "nTitle": "BanG Dream! Ave Mujica #1「Sub rosa.」" },
-        "ep1231523": { "sm": "so44461978", "bTitle": "第1话 秘密。(Sub rosa.)", "nTitle": "BanG Dream! Ave Mujica #1「Sub rosa.」" },
-        "ep1231524": { "sm": "so44516008", "bTitle": "第2话 用结果说话。(Exitus Acta probat.)", "nTitle": "BanG Dream! Ave Mujica #2「Exitus acta probat.」" },
-        "ep1231525": { "sm": "so44541203", "bTitle": "第3话 我该如何是好?(Quid faciam?)", "nTitle": "BanG Dream! Ave Mujica #3「Quid faciam?」" },
-        "ep1231526": { "sm": "so44565935", "bTitle": "第4话 演出已然落幕。(Acta est fabula.)", "nTitle": "BanG Dream! Ave Mujica #4「Acta est fabula.」" },
-        "ep1339696": { "sm": "so44590827", "bTitle": "第5话 舍既成之本,逐未竟之业。(Facta fugis, facienda petis.)", "nTitle": "BanG Dream! Ave Mujica #5「Facta fugis, facienda petis.」" },
-        "ep1339697": { "sm": "so44615719", "bTitle": "第6话 你将掌控心灵。(Animum reges.)", "nTitle": "BanG Dream! Ave Mujica #6「Animum reges.」" },
-        "ep1339698": { "sm": "so44648281", "bTitle": "第7话 雨过天晴。(Post nubila Phoebus.)", "nTitle": "BanG Dream! Ave Mujica #7「Post nubila Phoebus.」" },
-        "ep1424710": { "sm": "so44676695", "bTitle": "第8话 你是多首的怪物。(Belua multorum es capitums.)", "nTitle": "BanG Dream! Ave Mujica #8「Belua multorum es capitums.」" },
-        "ep1424711": { "sm": "so44700691", "bTitle": "第9话 君若离去,我不独生。(Ne vivam si abis.)", "nTitle": "BanG Dream! Ave Mujica #9「Ne vivam si abis.」" },
-        "ep1424712": { "sm": "so44726220", "bTitle": "第10话 爱恨交织。(Odi et amo.)", "nTitle": "BanG Dream! Ave Mujica #10「Odi et amo.」" },
-        "ep1449270": { "sm": "so44753167", "bTitle": "第11话 纵使焚身成灰,我亦要爱你。(Te ustus amem.)", "nTitle": "BanG Dream! Ave Mujica #11「Te ustus amem.」" },
-        "ep1449271": { "sm": "so44780291", "bTitle": "第12话 风吹浪打,亦不沉没。(Fluctuat nec mergitur.)", "nTitle": "BanG Dream! Ave Mujica #12「Fluctuat nec mergitur.」" },
-        "ep1449272": { "sm": "so44809405", "bTitle": "第13话 循此苦旅,终抵繁星。(Per aspera ad astra)", "nTitle": "BanG Dream! Ave Mujica #13「Per aspera ad astra.」" }
+        "ss73081": {
+          "sm": "so44461978",
+          "bTitle": "合集首页",
+          "nTitle": "BanG Dream! Ave Mujica #1「Sub rosa.」"
+        },
+        "ep1231523": {
+          "sm": "so44461978",
+          "bTitle": "第1话 秘密。(Sub rosa.)",
+          "nTitle": "BanG Dream! Ave Mujica #1「Sub rosa.」"
+        },
+        "ep1231524": {
+          "sm": "so44516008",
+          "bTitle": "第2话 用结果说话。(Exitus Acta probat.)",
+          "nTitle": "BanG Dream! Ave Mujica #2「Exitus acta probat.」"
+        },
+        "ep1231525": {
+          "sm": "so44541203",
+          "bTitle": "第3话 我该如何是好?(Quid faciam?)",
+          "nTitle": "BanG Dream! Ave Mujica #3「Quid faciam?」"
+        },
+        "ep1231526": {
+          "sm": "so44565935",
+          "bTitle": "第4话 演出已然落幕。(Acta est fabula.)",
+          "nTitle": "BanG Dream! Ave Mujica #4「Acta est fabula.」"
+        },
+        "ep1339696": {
+          "sm": "so44590827",
+          "bTitle": "第5话 舍既成之本,逐未竟之业。(Facta fugis, facienda petis.)",
+          "nTitle": "BanG Dream! Ave Mujica #5「Facta fugis, facienda petis.」"
+        },
+        "ep1339697": {
+          "sm": "so44615719",
+          "bTitle": "第6话 你将掌控心灵。(Animum reges.)",
+          "nTitle": "BanG Dream! Ave Mujica #6「Animum reges.」"
+        },
+        "ep1339698": {
+          "sm": "so44648281",
+          "bTitle": "第7话 雨过天晴。(Post nubila Phoebus.)",
+          "nTitle": "BanG Dream! Ave Mujica #7「Post nubila Phoebus.」"
+        },
+        "ep1424710": {
+          "sm": "so44676695",
+          "bTitle": "第8话 你是多首的怪物。(Belua multorum es capitums.)",
+          "nTitle": "BanG Dream! Ave Mujica #8「Belua multorum es capitums.」"
+        },
+        "ep1424711": {
+          "sm": "so44700691",
+          "bTitle": "第9话 君若离去,我不独生。(Ne vivam si abis.)",
+          "nTitle": "BanG Dream! Ave Mujica #9「Ne vivam si abis.」"
+        },
+        "ep1424712": {
+          "sm": "so44726220",
+          "bTitle": "第10话 爱恨交织。(Odi et amo.)",
+          "nTitle": "BanG Dream! Ave Mujica #10「Odi et amo.」"
+        },
+        "ep1449270": {
+          "sm": "so44753167",
+          "bTitle": "第11话 纵使焚身成灰,我亦要爱你。(Te ustus amem.)",
+          "nTitle": "BanG Dream! Ave Mujica #11「Te ustus amem.」"
+        },
+        "ep1449271": {
+          "sm": "so44780291",
+          "bTitle": "第12话 风吹浪打,亦不沉没。(Fluctuat nec mergitur.)",
+          "nTitle": "BanG Dream! Ave Mujica #12「Fluctuat nec mergitur.」"
+        },
+        "ep1449272": {
+          "sm": "so44809405",
+          "bTitle": "第13话 循此苦旅,终抵繁星。(Per aspera ad astra)",
+          "nTitle": "BanG Dream! Ave Mujica #13「Per aspera ad astra.」"
+        }
+      }
+    },
+    "安達としまむら (安达与岛村)": {
+      "biliSeason": "BV1xMrFBGEF2",
+      "nicoChannel": "ch2646377",
+      "eps": {
+        "BV1xMrFBGEF2|p1": {
+          "sm": "so37658638",
+          "bTitle": "第1集",
+          "nTitle": "安達としまむら 第1話「制服ピンポン」"
+        },
+        "BV1xMrFBGEF2|p2": {
+          "sm": "so37676295",
+          "bTitle": "第2集",
+          "nTitle": "安達としまむら 第2話「安達クエスチョン」"
+        },
+        "BV1xMrFBGEF2|p3": {
+          "sm": "so37725759",
+          "bTitle": "第3集",
+          "nTitle": "安達としまむら 第3話「二等辺トライアングル」"
+        },
+        "BV1xMrFBGEF2|p4": {
+          "sm": "so37743441",
+          "bTitle": "第4集",
+          "nTitle": "安達としまむら 第4話「女子高生ホリデイ」"
+        },
+        "BV1xMrFBGEF2|p5": {
+          "sm": "so37793632",
+          "bTitle": "第5集",
+          "nTitle": "安達としまむら 第5話「アダチズQ」"
+        },
+        "BV1xMrFBGEF2|p6": {
+          "sm": "so37827191",
+          "bTitle": "第6集",
+          "nTitle": "安達としまむら 第6話「ホワイト・アルバム」"
+        },
+        "BV1xMrFBGEF2|p7": {
+          "sm": "so37844198",
+          "bTitle": "第7集",
+          "nTitle": "安達としまむら 第7話「私に相応しいチョコを決めてください」"
+        },
+        "BV1xMrFBGEF2|p8": {
+          "sm": "so37893928",
+          "bTitle": "第8集",
+          "nTitle": "安達としまむら 第8話「過去を紡ぐ茨 オールドローズ」"
+        },
+        "BV1xMrFBGEF2|p9": {
+          "sm": "so37927421",
+          "bTitle": "第9集",
+          "nTitle": "安達としまむら 第9話「そして聖母を抱擁する愛 マリーゴールド」"
+        },
+        "BV1xMrFBGEF2|p10": {
+          "sm": "so37945464",
+          "bTitle": "第10集",
+          "nTitle": "安達としまむら 第10話「桜と春と 春と月と」"
+        },
+        "BV1xMrFBGEF2|p11": {
+          "sm": "so37974703",
+          "bTitle": "第11集",
+          "nTitle": "安達としまむら 第11話「月と決意と 決意と友と」"
+        },
+        "BV1xMrFBGEF2|p12": {
+          "sm": "so37999620",
+          "bTitle": "第12集",
+          "nTitle": "安達としまむら 第12話「友と愛と 愛と桜と」"
+        },
+        "BV1xMrFBGEF2": {
+          "sm": "so37658638",
+          "bTitle": "第1集",
+          "nTitle": "安達としまむら 第1話「制服ピンポン」"
+        }
       }
     }
   },
