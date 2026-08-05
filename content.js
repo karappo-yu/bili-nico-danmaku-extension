@@ -327,11 +327,13 @@
     return loaded;
   }
 
-  // 从文件名恢复 sm 输入框 (nico 精选弹幕 sm*.curated.json), 供刷新/切集后直接「刷新缓存」
+  // 同步 sm 输入框: 载入 nico 精选弹幕 (sm*.curated.json) 填视频号, 否则清空
+  // (防止切到无关联的 P / 载入普通文件后残留上一个视频的视频号)
   function syncSmInput(name) {
-    const smM = String(name || '').match(/^(sm\d+|so\d+|nm\d+)\.curated\.json$/i);
     const smInput = document.getElementById('ndp-sm');
-    if (smM && smInput) smInput.value = smM[1].toLowerCase();
+    if (!smInput) return;
+    const smM = String(name || '').match(/^(sm\d+|so\d+|nm\d+)\.curated\.json$/i);
+    smInput.value = smM ? smM[1].toLowerCase() : '';
   }
 
   async function loadFile(file, handle) {
@@ -364,6 +366,7 @@
     loadedVideoId = null;
     fileInput.value = '';
     fileNameEl.textContent = '未选择文件';
+    syncSmInput(''); // 清除/切到无关联视频 → 输入框清空, 防残留上个视频的视频号
     setStatus('');
     // 注意: 不删关联记录! 切集自动清除时 URL 已是新视频,
     // 若在这里删记录会误删新视频的关联 (死逻辑)。删除只发生在手动清除。
