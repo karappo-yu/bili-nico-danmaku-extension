@@ -336,6 +336,10 @@
       currentHandle = handle || null;
       loadedVideoId = currentVideoId();
       if (fileNameEl) fileNameEl.textContent = file.name;
+      // nico 精选弹幕 (sm9.curated.json) → 恢复输入框, 刷新页面后可直接点「刷新缓存」
+      const smM = String(file.name).match(/^(sm\d+|so\d+|nm\d+)\.curated\.json$/i);
+      const smInput = document.getElementById('ndp-sm');
+      if (smM && smInput) smInput.value = smM[1].toLowerCase();
       await saveDanmakuRecord(loadedVideoId, file.name, text, currentHandle); // 记住关联, 刷新后自动加载
       resyncDmTime();
       if (host) initEngine();
