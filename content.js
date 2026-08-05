@@ -327,6 +327,13 @@
     return loaded;
   }
 
+  // 从文件名恢复 sm 输入框 (nico 精选弹幕 sm*.curated.json), 供刷新/切集后直接「刷新缓存」
+  function syncSmInput(name) {
+    const smM = String(name || '').match(/^(sm\d+|so\d+|nm\d+)\.curated\.json$/i);
+    const smInput = document.getElementById('ndp-sm');
+    if (smM && smInput) smInput.value = smM[1].toLowerCase();
+  }
+
   async function loadFile(file, handle) {
     try {
       const text = await file.text();
@@ -336,10 +343,7 @@
       currentHandle = handle || null;
       loadedVideoId = currentVideoId();
       if (fileNameEl) fileNameEl.textContent = file.name;
-      // nico 精选弹幕 (sm9.curated.json) → 恢复输入框, 刷新页面后可直接点「刷新缓存」
-      const smM = String(file.name).match(/^(sm\d+|so\d+|nm\d+)\.curated\.json$/i);
-      const smInput = document.getElementById('ndp-sm');
-      if (smM && smInput) smInput.value = smM[1].toLowerCase();
+      syncSmInput(file.name);
       await saveDanmakuRecord(loadedVideoId, file.name, text, currentHandle); // 记住关联, 刷新后自动加载
       resyncDmTime();
       if (host) initEngine();
@@ -662,6 +666,7 @@
           currentHandle = null;
           loadedVideoId = newVid;
           if (fileNameEl) fileNameEl.textContent = rec.name;
+          syncSmInput(rec.name); // 切集后输入框跟随更新 (刷新缓存可用)
           applyStoredOffset(newVid);
           resyncDmTime();
           if (host) initEngine();
